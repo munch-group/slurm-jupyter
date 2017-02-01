@@ -1,0 +1,343 @@
+#!/usr/bin/env python
+from __future__ import (absolute_import, division, print_function, unicode_literals)
+import subprocess
+import sys
+import os
+import re
+import time
+import select
+import getpass
+import webbrowser
+import platform
+import argparse
+import signal
+
+from subprocess import PIPE, Popen
+from threading  import Thread, Event
+
+try:
+    from Queue import Queue, Empty
+except ImportError:
+    from queue import Queue, Empty  # python 3.x
+
+if sys.version_info < (3,0):
+    input = raw_input
+
+def execute(cmd, stdin=None):
+    process = Popen(cmd.split(), stdin=PIPE, stdout=PIPE, stderr=PIPE)
+    stdout, stderr = process.communicate(stdin)
+    return stdout, stderr
+
+BLUE = '\033[94m'
+GREEN = '\033[92m'
+YELLOW = '\033[93m'
+RED = '\033[91m'
+ENDC = '\033[0m'
+
+
+slurm_script =  """#!/bin/sh
+#SBATCH -A {account}
+#SBATCH -p {queue}
+#SBATCH -N {nr_nodes}
+#SBATCH -c {nr_cores}
+#SBATCH -t {walltime}
+#SBATCH --mem-per-cpu={memory}
+#SBATCH -o {tmp_name}.%j.out
+#SBATCH -e {tmp_name}.%j.err
+#SBATCH -J jptr
+
+{sources_loaded}
+
+##cd "{cwd}"
+
+export PATH=~/anaconda2/bin:~/anaconda/bin:$PATH
+
+{environment}
+
+##ipcluster
+jupyter notebook
+
+"""
+
+# Ask for confirmation on keyboard interrupt
+def kbintr_handler(signal, frame):
+    msg = RED+'\nAre you sure? y/n: '+ENDC
+    try:
+        if input(msg) == 'y':
+            raise KeyboardInterrupt
+    except RuntimeError: # incase user coes Ctrl-C instead of y
+        raise KeyboardInterrupt
+
+
+def kbintr_repressor(signal, frame):
+    pass
+
+
+def submit_slurm_job(spec):
+    # cmd = 'ssh {user}@{frontend} "cat - > {tmp_script} ; /opt/slurm/bin/sbatch {tmp_script} "'.format(**spec)
+    cmd = 'ssh {user}@{frontend} cat - > {tmp_script} ; {slurm} ; sbatch {tmp_script} '.format(**spec)
+
+    script = slurm_script.format(**spec)
+
+    if sys.version_info >= (3,0): script = script.encode()
+    stdout, stderr = execute(cmd, stdin=script) # hangs untill submission
+
+    # get stdour and stderr and get jobid
+    if sys.version_info >= (3,0): stdout = stdout.decode()
+    try:
+        job_id = re.search('Submitted batch job (\d+)', stdout).group(1)
+    except AttributeError:
+        print(RED+'Slurm job submission failed'+ENDC)
+        print(stdout)
+        sys.exit()
+
+    return job_id
+
+
+def wait_for_job_allocation(spec):
+    # wait for job to start and get node it runs on 
+    regex = re.compile('Nodes\s+:\s+(\S+)')
+    cmd = 'ssh {user}@{frontend} {slurm} ; jobinfo {job_id}'.format(**spec)        
+    stdout, stderr = execute(cmd)
+    if sys.version_info >= (3,0): stdout = stdout.decode()
+    m = regex.search(stdout)
+
+    while not m or m.group(1) == 'None':
+        time.sleep(5)
+        stdout, stderr = execute(cmd)
+        if sys.version_info >= (3,0):
+            stdout = stdout.decode()
+        m = regex.search(stdout)
+    print(stdout)
+
+    node_id = m.group(1)
+    return node_id
+
+
+# read line without blocking
+def enqueue_output(out, queue):
+    p = select.poll()
+    p.register(out)
+    while run_event.is_set():
+        if p.poll(1):
+            # c = out.read(1)
+            c = out.readline()
+            queue.put(c)
+        time.sleep(.1)
+
+
+def open_stdout_connection(spec):
+    cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_name}.{job_id}.out'.format(**spec)
+    stdout_p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE, bufsize=1, close_fds=True)
+    stdout_q = Queue()
+    stdout_t = Thread(target=enqueue_output, args=(stdout_p.stdout, stdout_q))
+    stdout_t.daemon = True # thread dies with the program
+    stdout_t.start()
+    return stdout_p, stdout_t, stdout_q
+
+
+def open_stderr_connection(spec):
+    cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_name}.{job_id}.err'.format(**spec)
+    stderr_p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE, bufsize=1, close_fds=True)
+    stderr_q = Queue()
+    stderr_t = Thread(target=enqueue_output, args=(stderr_p.stdout, stderr_q))
+    stderr_t.daemon = True # thread dies with the program
+    stderr_t.start()
+    return stderr_p, stderr_t, stderr_q
+
+
+def open_port(spec):
+    cmd = 'ssh -L{port}:{node}:{hostport} {user}@{frontend}'.format(**spec)
+    port_p = Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+    # we have to set stdin=PIPE even though we eodn't use it because this
+    # makes sure the process does not inherrit stdin from the parent process (this).
+    # Otherwise signals are sent to the process and not to the python script
+    port_q = Queue()
+    port_t = Thread(target=enqueue_output, args=(port_p.stderr, port_q))
+    port_t.daemon = True # thread dies with the program
+    port_t.start()
+    return port_p, port_t, port_q
+
+
+def open_chrome(spec):
+    # start chrome
+    if platform.platform().startswith('Darwin'):
+        chrome_path = 'open -a /Applications/Google\ Chrome.app %s'
+    else:
+        chrome_path = '/usr/bin/google-chrome %s'
+    webbrowser.get(chrome_path).open('https://localhost:{port}'.format(**spec))
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-f", "--frontend", dest="frontend", type=str, default="login.genome.au.dk", help="url to frontend")
+parser.add_argument("-A", "--account",
+                  dest="account",
+                  type=str,
+                  default=None,
+                  help="Account/Project to run under")
+parser.add_argument("-q", "--queue",
+                  dest="queue",
+                  type=str,
+                  default="normal",
+                  help="Number of nodes")
+parser.add_argument("-n", "--nodes",
+                  dest="nodes",
+                  type=int,
+                  default=1,
+                  help="Number of nodes")
+parser.add_argument("-c", "--cores",
+                  dest="cores",
+                  type=int,
+                  default=1,
+                  help="Number of cores. Only for multiprocessing.")
+parser.add_argument("-m", "--memory",
+                  dest="memory",
+                  type=str,
+                  default="4G",
+                  help="Max memory. e.g. 1G")
+parser.add_argument("-t", "--time",
+                  dest="time",
+                  type=str,
+                  default="1-00:00:00",
+                  help="Max wall time: HH:MM:SS")
+parser.add_argument("-N", "--name",
+                  dest="name",
+                  type=str,
+                  default="jptr",
+                  help="Name of job")
+parser.add_argument("-u", "--user",
+                  dest="user",
+                  type=str,
+                  default=getpass.getuser(),
+                  help="User name")
+parser.add_argument("-p", "--port",
+                  dest="port",
+                  type=int,
+                  default=6357,
+                  help="local port")
+parser.add_argument("-e", "--environment",
+                  dest="environment",
+                  type=str,
+                  default='',
+                  help="environment")
+
+args = parser.parse_args()
+
+spec = {'user': args.user,
+        'port': args.port,
+        'environment': args.environment,
+        'walltime': args.time,
+        'memory': args.memory,
+        'account': args.account,
+        'queue': args.queue,
+        'nr_nodes': args.nodes,
+        'nr_cores': args.cores,
+        'cwd': os.getcwd(),
+        'sources_loaded': '',
+        'slurm': 'source /com/extra/slurm/14.03.0/load.sh',
+        'tmp_script': 'testing_jupyter.sh',
+        'tmp_name': 'testing_jupyter',
+        'frontend': args.frontend,
+        'hostport': 6357,
+        'job_id': None }
+
+assert args.account, 'You have to specify an account using -A'
+
+tup = spec['walltime'].split('-')
+if len(tup) == 1:
+    days, (hours, mins, secs) = 0, tup[0].split(':')
+else:
+    days, (hours, mins, secs) = tup[0], tup[1].split(':')
+end_time = time.time() + int(days) * 86400 + int(hours) * 3600 + int(mins) * 60 + int(secs)
+
+if args.environment:
+    spec['environment'] = "\nsource deactivate\nsource activate " + args.environment
+
+# incept keyboard interrupt with user prompt
+signal.signal(signal.SIGINT, kbintr_handler)
+
+try:
+
+    spec['job_id'] = submit_slurm_job(spec)
+    print(RED+'Waiting for slurm job allocation'+ENDC)
+
+    spec['node'] = wait_for_job_allocation(spec)
+    print(RED+'Compute node(s) allocated'+ENDC)
+
+    run_event = Event()
+    run_event.set()
+
+    print(RED+'Jupyter server: (to stop the server press Ctrl-C)'+ENDC)
+
+    stdout_p, stdout_t, stdout_q = open_stdout_connection(spec)
+    stderr_p, stderr_t, stderr_q = open_stderr_connection(spec)
+
+    regex = re.compile('https://\[all ip addresses on your system\]:(\d+)/')
+
+    hostport = None
+
+    while True:
+        while True:
+            try:  
+                line = stdout_q.get(timeout=.1)#get_nowait()
+            except Empty:
+                break
+            else:
+                if sys.version_info >= (3,0):
+                    line = line.decode()
+                line = line.replace('\r', '\n')
+                print(line, end="")
+        while True:
+            try:  
+                line = stderr_q.get(timeout=.1)#get_nowait()
+            except Empty:
+                break
+            else:
+                if sys.version_info >= (3,0):
+                    line = line.decode()
+                line = line.replace('\r', '\n')
+                print(line, end="")
+
+                m = regex.search(line)
+                if m:
+                    spec['hostport'] = m.group(1)
+                    port_p, port_t, port_q = open_port(spec)
+
+                    open_chrome(spec)
+                    print(RED+'If your browser says "Your connection is not private", clidk "Advanced" and then "Proceed etc. (unsafe)"'+ENDC)
+        while hostport:
+            try:  
+                line = port_q.get(timeout=.1)#get_nowait()
+            except Empty:
+                break
+            else:
+                line = line.replace('\r', '\n')
+                print(line, end="")
+
+except KeyboardInterrupt:
+
+    # not possible to do Keyboard interrupt from hereon out
+    signal.signal(signal.SIGINT, kbintr_repressor)
+
+    # in try statements becuase these vars may not be defined at keyboard interrupt:
+    try:
+        run_event.clear()
+        port_t.join()
+        port_p.kill()
+    except:
+        pass
+    try:
+        stdout_t.join()
+        stdout_p.kill()
+    except:
+        pass
+    try:
+        stderr_p.kill()
+        stderr_t.join()
+    except:
+        pass
+
+    print(RED+'\nCanceling slurm job running jupyter server'+ENDC)
+    stdout, stderr = execute('ssh {user}@{frontend} {slurm} ; scancel {job_id}'.format(**spec))
+    sys.exit()
+
