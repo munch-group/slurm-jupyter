@@ -42,8 +42,8 @@ slurm_script =  """#!/bin/sh
 #SBATCH -c {nr_cores}
 #SBATCH -t {walltime}
 #SBATCH --mem-per-cpu={memory}
-#SBATCH -o {tmp_name}.%j.out
-#SBATCH -e {tmp_name}.%j.err
+#SBATCH -o {tmp_dir}/{tmp_name}.%j.out
+#SBATCH -e {tmp_dir}/{tmp_name}.%j.err
 #SBATCH -J jptr
 
 {sources_loaded}
@@ -54,7 +54,8 @@ export PATH=~/anaconda2/bin:~/anaconda/bin:$PATH
 
 {environment}
 
-##ipcluster
+{ipcluster}
+
 jupyter notebook
 
 """
@@ -74,8 +75,7 @@ def kbintr_repressor(signal, frame):
 
 
 def submit_slurm_job(spec):
-    # cmd = 'ssh {user}@{frontend} "cat - > {tmp_script} ; /opt/slurm/bin/sbatch {tmp_script} "'.format(**spec)
-    cmd = 'ssh {user}@{frontend} cat - > {tmp_script} ; {slurm} ; sbatch {tmp_script} '.format(**spec)
+    cmd = 'ssh {user}@{frontend} cat - > {tmp_dir}/{tmp_script} ; mkdir -p {tmp_dir} ; {slurm} ; sbatch {tmp_script} '.format(**spec)
 
     script = slurm_script.format(**spec)
 
@@ -127,7 +127,7 @@ def enqueue_output(out, queue):
 
 
 def open_stdout_connection(spec):
-    cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_name}.{job_id}.out'.format(**spec)
+    cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.out'.format(**spec)
     stdout_p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE, bufsize=1, close_fds=True)
     stdout_q = Queue()
     stdout_t = Thread(target=enqueue_output, args=(stdout_p.stdout, stdout_q))
@@ -137,7 +137,7 @@ def open_stdout_connection(spec):
 
 
 def open_stderr_connection(spec):
-    cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_name}.{job_id}.err'.format(**spec)
+    cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err'.format(**spec)
     stderr_p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE, bufsize=1, close_fds=True)
     stderr_q = Queue()
     stderr_t = Thread(target=enqueue_output, args=(stderr_p.stdout, stderr_q))
@@ -235,8 +235,9 @@ spec = {'user': args.user,
         'cwd': os.getcwd(),
         'sources_loaded': '',
         'slurm': 'source /com/extra/slurm/14.03.0/load.sh',
-        'tmp_script': 'testing_jupyter.sh',
-        'tmp_name': 'testing_jupyter',
+        'tmp_script': 'slurm_jupyter.sh',
+        'tmp_name': 'slurm_jupyter',
+        'tmp_dir': '.slurm_jupyter',
         'frontend': args.frontend,
         'hostport': 6357,
         'job_id': None }
@@ -253,7 +254,14 @@ end_time = time.time() + int(days) * 86400 + int(hours) * 3600 + int(mins) * 60 
 if args.environment:
     spec['environment'] = "\nsource deactivate\nsource activate " + args.environment
 
-# incept keyboard interrupt with user prompt
+
+if args.cores > 1:
+    spec['ipcluster'] = "ipcluster start -n {}".format(args.cores)
+else:
+    spec['ipcluster'] = ""
+    
+
+#incept keyboard interrupt with user prompt
 signal.signal(signal.SIGINT, kbintr_handler)
 
 try:
