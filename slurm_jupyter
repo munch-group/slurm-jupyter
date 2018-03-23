@@ -13,7 +13,7 @@ import argparse
 import signal
 
 from subprocess import PIPE, Popen
-from threading  import Thread, Event
+from threading  import Thread, Event, Timer
 
 try:
     from Queue import Queue, Empty
@@ -36,15 +36,15 @@ ENDC = '\033[0m'
 
 
 slurm_script =  """#!/bin/sh
-#SBATCH -A {account}
 #SBATCH -p {queue}
-#SBATCH -N {nr_nodes}
+{memory_spec}
+#SBATCH -n {nr_nodes}
 #SBATCH -c {nr_cores}
 #SBATCH -t {walltime}
-#SBATCH --mem-per-cpu={memory}
 #SBATCH -o {tmp_dir}/{tmp_name}.%j.out
 #SBATCH -e {tmp_dir}/{tmp_name}.%j.err
 #SBATCH -J jptr
+{account_spec}
 
 {sources_loaded}
 
@@ -56,7 +56,7 @@ export PATH=~/anaconda2/bin:~/anaconda/bin:$PATH
 
 {ipcluster}
 
-jupyter notebook
+jupyter notebook --NotebookApp.iopub_data_rate_limit=10000000000
 
 """
 
@@ -75,7 +75,8 @@ def kbintr_repressor(signal, frame):
 
 
 def submit_slurm_job(spec):
-    cmd = 'ssh {user}@{frontend} cat - > {tmp_dir}/{tmp_script} ; mkdir -p {tmp_dir} ; {slurm} ; sbatch {tmp_script} '.format(**spec)
+
+    cmd = 'ssh {user}@{frontend} cat - > {tmp_dir}/{tmp_script} ; mkdir -p {tmp_dir} ; {slurm} ; sbatch {tmp_dir}/{tmp_script} '.format(**spec)
 
     script = slurm_script.format(**spec)
 
@@ -95,6 +96,9 @@ def submit_slurm_job(spec):
 
 
 def wait_for_job_allocation(spec):
+    # wait a bit to make sure jobinfo database is updated
+    time.sleep(20)
+
     # wait for job to start and get node it runs on 
     regex = re.compile('Nodes\s+:\s+(\S+)')
     cmd = 'ssh {user}@{frontend} {slurm} ; jobinfo {job_id}'.format(**spec)        
@@ -103,7 +107,7 @@ def wait_for_job_allocation(spec):
     m = regex.search(stdout)
 
     while not m or m.group(1) == 'None':
-        time.sleep(5)
+        time.sleep(10)
         stdout, stderr = execute(cmd)
         if sys.version_info >= (3,0):
             stdout = stdout.decode()
@@ -165,7 +169,42 @@ def open_chrome(spec):
         chrome_path = 'open -a /Applications/Google\ Chrome.app %s'
     else:
         chrome_path = '/usr/bin/google-chrome %s'
-    webbrowser.get(chrome_path).open('https://localhost:{port}'.format(**spec))
+    url = 'https://localhost:{port}'.format(**spec)
+    print(url)
+    webbrowser.get(chrome_path).open(url)
+
+
+def str_to_mb(s):
+    # compute mem in mb
+    scale = s[-1].lower()
+    assert scale in ['k', 'm', 'g']
+    memory_per_cpu_mb = int(s[:-1])
+    if scale == 'g':
+        memory_per_cpu_mb *= 1024
+    if scale == 'k':
+        memory_per_cpu_mb /= 1024.0
+    return memory_per_cpu_mb
+
+
+def print_memory_status(spec):
+    process = Popen("ssh {user}@{frontend} {slurm} ; jobinfo {job_id}".format(**spec).split(), stdout=PIPE, stderr=PIPE)
+    stdout, stderr = process.communicate()
+    used_mb_mem_all_cores = 0
+    for line in stdout.split('\n'):
+        if line.startswith('Mem reserved'):
+            mem = re.search(r': (\d+\.?\d*[GgMmKk])/core', line).group(1)
+            reserved_mb_mem_per_core = str_to_mb(mem)
+        elif line.startswith('Mem used'):
+            mem = re.search(r': (\d+\.?\d*[GgMmKk])', line).group(1)
+            used_mb_mem_all_cores = str_to_mb(mem)
+    print("Using {} Mb of {} Mb allocated memory".format(used_mb_mem_all_cores / 1024.0,
+        reserved_mb_mem_per_core * spec['nr_cores'] / 1024.0), file=sys.stderr)
+
+
+"""
+Mem reserved        : 15G/core
+Max Mem used        : 1.92G (s01n34)
+"""
 
 
 parser = argparse.ArgumentParser()
@@ -190,11 +229,6 @@ parser.add_argument("-c", "--cores",
                   type=int,
                   default=1,
                   help="Number of cores. Only for multiprocessing.")
-parser.add_argument("-m", "--memory",
-                  dest="memory",
-                  type=str,
-                  default="4G",
-                  help="Max memory. e.g. 1G")
 parser.add_argument("-t", "--time",
                   dest="time",
                   type=str,
@@ -220,14 +254,33 @@ parser.add_argument("-e", "--environment",
                   type=str,
                   default='',
                   help="environment")
+parser.add_argument("--timeout",
+                  dest="timeout",
+                  default=0.1,
+                  type=float,
+                  help="Time out in seconds for cross thread operations")
+
+group = parser.add_mutually_exclusive_group(required=True)
+group.add_argument("--memory-per-cpu",
+                  dest="memory_per_cpu",
+                  type=str,
+                  help="Max memory for each core e.g. 4G")
+group.add_argument("-m", "--total-memory",
+                  dest="total_memory",
+                  type=str,
+                  help="Max memory total for all cores. e.g. 4G")
 
 args = parser.parse_args()
+
+if args.nodes != 1:
+    print("Multiprocessign across multiple nodes not supported yet - sorry")
+    sys.exit()
 
 spec = {'user': args.user,
         'port': args.port,
         'environment': args.environment,
         'walltime': args.time,
-        'memory': args.memory,
+#        'memory': memory_per_cpu_mb,
         'account': args.account,
         'queue': args.queue,
         'nr_nodes': args.nodes,
@@ -242,7 +295,7 @@ spec = {'user': args.user,
         'hostport': 6357,
         'job_id': None }
 
-assert args.account, 'You have to specify an account using -A'
+#assert args.account, 'You have to specify an account using -A'
 
 tup = spec['walltime'].split('-')
 if len(tup) == 1:
@@ -251,15 +304,24 @@ else:
     days, (hours, mins, secs) = tup[0], tup[1].split(':')
 end_time = time.time() + int(days) * 86400 + int(hours) * 3600 + int(mins) * 60 + int(secs)
 
+if args.total_memory:
+    spec['memory_spec'] = '#SBATCH --mem {}'.format(str_to_mb(args.total_memory))
+else:
+    spec['memory_spec'] = '#SBATCH --mem-per-cpu {}'.format(str_to_mb(args.memory_per_cpu))
+
 if args.environment:
     spec['environment'] = "\nsource deactivate\nsource activate " + args.environment
 
-
 if args.cores > 1:
-    spec['ipcluster'] = "ipcluster start -n {}".format(args.cores)
+    spec['ipcluster'] = "ipcluster start -n {} &".format(args.cores)
 else:
     spec['ipcluster'] = ""
     
+
+if args.account:
+    spec['account_spec'] = "#SBATCH -A {}".format(args.account)
+else:
+    spec['account_spec'] = ""
 
 #incept keyboard interrupt with user prompt
 signal.signal(signal.SIGINT, kbintr_handler)
@@ -284,10 +346,14 @@ try:
 
     hostport = None
 
+    #mem_print_t = Timer(10, print_memory_status, args=[spec])
+    #mem_print_t.daemon = True
+    #mem_print_t.start() 
+
     while True:
         while True:
             try:  
-                line = stdout_q.get(timeout=.1)#get_nowait()
+                line = stdout_q.get(timeout=args.timeout)#get_nowait()
             except Empty:
                 break
             else:
@@ -297,7 +363,7 @@ try:
                 print(line, end="")
         while True:
             try:  
-                line = stderr_q.get(timeout=.1)#get_nowait()
+                line = stderr_q.get(timeout=args.timeout)#get_nowait()
             except Empty:
                 break
             else:
@@ -315,7 +381,7 @@ try:
                     print(RED+'If your browser says "Your connection is not private", clidk "Advanced" and then "Proceed etc. (unsafe)"'+ENDC)
         while hostport:
             try:  
-                line = port_q.get(timeout=.1)#get_nowait()
+                line = port_q.get(timeout=args.timeout)#get_nowait()
             except Empty:
                 break
             else:
@@ -344,6 +410,11 @@ except KeyboardInterrupt:
         stderr_t.join()
     except:
         pass
+    try:
+        mem_print_t.join()
+    except:
+        pass
+
 
     print(RED+'\nCanceling slurm job running jupyter server'+ENDC)
     stdout, stderr = execute('ssh {user}@{frontend} {slurm} ; scancel {job_id}'.format(**spec))
