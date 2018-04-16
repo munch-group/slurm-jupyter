@@ -74,6 +74,19 @@ def kbintr_repressor(signal, frame):
     pass
 
 
+def get_cluster_uid(spec):
+
+    process = subprocess.Popen(
+        'ssh {user}@{frontend} id'.format(**spec),
+        shell=True,
+        universal_newlines=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE)
+    stdout, stderr = process.communicate()
+    uid = int(re.match('uid=(\d+)', stdout).group(1))
+    return uid
+
+
 def submit_slurm_job(spec):
 
     cmd = 'ssh {user}@{frontend} cat - > {tmp_dir}/{tmp_script} ; mkdir -p {tmp_dir} ; {slurm} ; sbatch {tmp_dir}/{tmp_script} '.format(**spec)
@@ -247,7 +260,7 @@ parser.add_argument("-u", "--user",
 parser.add_argument("-p", "--port",
                   dest="port",
                   type=int,
-                  default=6357,
+                  default=None,
                   help="local port")
 parser.add_argument("-e", "--environment",
                   dest="environment",
@@ -272,6 +285,7 @@ group.add_argument("-m", "--total-memory",
 
 args = parser.parse_args()
 
+
 if args.nodes != 1:
     print("Multiprocessign across multiple nodes not supported yet - sorry")
     sys.exit()
@@ -292,8 +306,13 @@ spec = {'user': args.user,
         'tmp_name': 'slurm_jupyter',
         'tmp_dir': '.slurm_jupyter',
         'frontend': args.frontend,
-        'hostport': 6357,
+        'hostport': args.port,
         'job_id': None }
+
+
+
+if spec['port'] is None:
+    spec['port'] = get_cluster_uid(spec)
 
 #assert args.account, 'You have to specify an account using -A'
 
@@ -312,10 +331,11 @@ else:
 if args.environment:
     spec['environment'] = "\nsource deactivate\nsource activate " + args.environment
 
-if args.cores > 1:
-    spec['ipcluster'] = "ipcluster start -n {} &".format(args.cores)
-else:
-    spec['ipcluster'] = ""
+# if args.cores > 1:
+#     spec['ipcluster'] = "ipcluster start -n {} &".format(args.cores)
+# else:
+#     spec['ipcluster'] = ""
+spec['ipcluster'] = "ipcluster start -n {} &".format(args.cores)
     
 
 if args.account:
