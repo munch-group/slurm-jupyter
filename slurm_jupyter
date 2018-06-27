@@ -56,6 +56,8 @@ export PATH=~/anaconda2/bin:~/anaconda/bin:$PATH
 
 {ipcluster}
 
+unset XDG_RUNTIME_DIR
+
 jupyter notebook --NotebookApp.iopub_data_rate_limit=10000000000
 
 """
