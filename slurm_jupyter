@@ -28,13 +28,15 @@ def execute(cmd, stdin=None):
     stdout, stderr = process.communicate(stdin)
     return stdout, stderr
 
+
+# terminal colors
 BLUE = '\033[94m'
 GREEN = '\033[92m'
 YELLOW = '\033[93m'
 RED = '\033[91m'
 ENDC = '\033[0m'
 
-
+# string template for slurm script
 slurm_script =  """#!/bin/sh
 #SBATCH -p {queue}
 {memory_spec}
@@ -58,7 +60,7 @@ export PATH=~/anaconda2/bin:~/anaconda/bin:$PATH
 
 unset XDG_RUNTIME_DIR
 
-jupyter notebook --NotebookApp.iopub_data_rate_limit=10000000000
+jupyter notebook --no-browser --port={hostport} --NotebookApp.iopub_data_rate_limit=10000000000
 
 """
 
@@ -92,8 +94,9 @@ def get_cluster_uid(spec):
 def submit_slurm_job(spec):
 
     cmd = 'ssh {user}@{frontend} cat - > {tmp_dir}/{tmp_script} ; mkdir -p {tmp_dir} ; {slurm} ; sbatch {tmp_dir}/{tmp_script} '.format(**spec)
-
+        
     script = slurm_script.format(**spec)
+    if args.verbose: print("slurm script:", script, sep='\n')
 
     if sys.version_info >= (3,0): script = script.encode()
     stdout, stderr = execute(cmd, stdin=script) # hangs untill submission
@@ -106,6 +109,7 @@ def submit_slurm_job(spec):
         print(RED+'Slurm job submission failed'+ENDC)
         print(stdout)
         sys.exit()
+    print(RED+"Submitted slurm with job id:", job_id, ENDC)
 
     return job_id
 
@@ -127,7 +131,7 @@ def wait_for_job_allocation(spec):
         if sys.version_info >= (3,0):
             stdout = stdout.decode()
         m = regex.search(stdout)
-    print(stdout)
+    if args.verbose: print(stdout)
 
     node_id = m.group(1)
     return node_id
@@ -147,6 +151,7 @@ def enqueue_output(out, queue):
 
 def open_stdout_connection(spec):
     cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.out'.format(**spec)
+    if args.verbose: print("stdout connection:", cmd)
     stdout_p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE, bufsize=1, close_fds=True)
     stdout_q = Queue()
     stdout_t = Thread(target=enqueue_output, args=(stdout_p.stdout, stdout_q))
@@ -157,6 +162,7 @@ def open_stdout_connection(spec):
 
 def open_stderr_connection(spec):
     cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err'.format(**spec)
+    if args.verbose: print("stderr connection:", cmd)
     stderr_p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE, bufsize=1, close_fds=True)
     stderr_q = Queue()
     stderr_t = Thread(target=enqueue_output, args=(stderr_p.stdout, stderr_q))
@@ -166,7 +172,8 @@ def open_stderr_connection(spec):
 
 
 def open_port(spec):
-    cmd = 'ssh -L{port}:{node}:{hostport} {user}@{frontend}'.format(**spec)
+    cmd = 'ssh -L{port}:{node}.genomedk.net:{hostport} {user}@{frontend}'.format(**spec)
+    if args.verbose: print("forwarding port:", cmd)
     port_p = Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
     # we have to set stdin=PIPE even though we eodn't use it because this
     # makes sure the process does not inherrit stdin from the parent process (this).
@@ -179,7 +186,6 @@ def open_port(spec):
 
 
 def open_chrome(spec):
-    # start chrome
     if platform.platform().startswith('Darwin'):
         chrome_path = 'open -a /Applications/Google\ Chrome.app %s'
     else:
@@ -214,12 +220,6 @@ def print_memory_status(spec):
             used_mb_mem_all_cores = str_to_mb(mem)
     print("Using {} Mb of {} Mb allocated memory".format(used_mb_mem_all_cores / 1024.0,
         reserved_mb_mem_per_core * spec['nr_cores'] / 1024.0), file=sys.stderr)
-
-
-"""
-Mem reserved        : 15G/core
-Max Mem used        : 1.92G (s01n34)
-"""
 
 
 parser = argparse.ArgumentParser()
@@ -259,11 +259,16 @@ parser.add_argument("-u", "--user",
                   type=str,
                   default=getpass.getuser(),
                   help="User name")
-parser.add_argument("-p", "--port",
+parser.add_argument("--port",
                   dest="port",
                   type=int,
                   default=None,
                   help="local port")
+parser.add_argument("--hostport",
+                  dest="hostport",
+                  type=int,
+                  default=None,
+                  help="port on cluster")
 parser.add_argument("-e", "--environment",
                   dest="environment",
                   type=str,
@@ -274,6 +279,10 @@ parser.add_argument("--timeout",
                   default=0.1,
                   type=float,
                   help="Time out in seconds for cross thread operations")
+parser.add_argument("-v", "--verbose",
+                  dest="verbose",
+                  action='store_true',
+                  help="Print debugging information")
 
 group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument("--memory-per-cpu",
@@ -296,7 +305,6 @@ spec = {'user': args.user,
         'port': args.port,
         'environment': args.environment,
         'walltime': args.time,
-#        'memory': memory_per_cpu_mb,
         'account': args.account,
         'queue': args.queue,
         'nr_nodes': args.nodes,
@@ -311,12 +319,11 @@ spec = {'user': args.user,
         'hostport': args.port,
         'job_id': None }
 
-
-
-if spec['port'] is None:
+if args.port is None:
     spec['port'] = get_cluster_uid(spec)
 
-#assert args.account, 'You have to specify an account using -A'
+if args.hostport is None:
+    spec['hostport'] = get_cluster_uid(spec)
 
 tup = spec['walltime'].split('-')
 if len(tup) == 1:
@@ -333,28 +340,22 @@ else:
 if args.environment:
     spec['environment'] = "\nsource deactivate\nsource activate " + args.environment
 
-# if args.cores > 1:
-#     spec['ipcluster'] = "ipcluster start -n {} &".format(args.cores)
-# else:
-#     spec['ipcluster'] = ""
 spec['ipcluster'] = "ipcluster start -n {} &".format(args.cores)
     
-
 if args.account:
     spec['account_spec'] = "#SBATCH -A {}".format(args.account)
 else:
     spec['account_spec'] = ""
 
-#incept keyboard interrupt with user prompt
+# incept keyboard interrupt with user prompt
 signal.signal(signal.SIGINT, kbintr_handler)
 
 try:
-
     spec['job_id'] = submit_slurm_job(spec)
     print(RED+'Waiting for slurm job allocation'+ENDC)
 
     spec['node'] = wait_for_job_allocation(spec)
-    print(RED+'Compute node(s) allocated'+ENDC)
+    print(RED+'Compute node(s) allocated:', spec['node'], ENDC)
 
     run_event = Event()
     run_event.set()
@@ -364,9 +365,7 @@ try:
     stdout_p, stdout_t, stdout_q = open_stdout_connection(spec)
     stderr_p, stderr_t, stderr_q = open_stderr_connection(spec)
 
-    regex = re.compile('https://\[all ip addresses on your system\]:(\d+)/')
-
-    hostport = None
+    regex = re.compile(r'The Jupyter Notebook is running')
 
     #mem_print_t = Timer(10, print_memory_status, args=[spec])
     #mem_print_t.daemon = True
@@ -394,22 +393,12 @@ try:
                 line = line.replace('\r', '\n')
                 print(line, end="")
 
-                m = regex.search(line)
-                if m:
-                    spec['hostport'] = m.group(1)
+                if re.search('The Jupyter Notebook is running', line):
                     port_p, port_t, port_q = open_port(spec)
 
                     open_chrome(spec)
-                    print(RED+'If your browser says "Your connection is not private", clidk "Advanced" and then "Proceed etc. (unsafe)"'+ENDC)
-        while hostport:
-            try:  
-                line = port_q.get(timeout=args.timeout)#get_nowait()
-            except Empty:
-                break
-            else:
-                line = line.replace('\r', '\n')
-                print(line, end="")
-
+                    print(RED+'If your browser says "Your connection is not private",',
+                     'click "Advanced" and then "Proceed etc. (unsafe)"'+ENDC)
 except KeyboardInterrupt:
 
     # not possible to do Keyboard interrupt from hereon out
@@ -422,21 +411,23 @@ except KeyboardInterrupt:
         port_p.kill()
     except:
         pass
+
     try:
         stdout_t.join()
         stdout_p.kill()
     except:
         pass
+
     try:
         stderr_p.kill()
         stderr_t.join()
     except:
         pass
+        
     try:
         mem_print_t.join()
     except:
         pass
-
 
     print(RED+'\nCanceling slurm job running jupyter server'+ENDC)
     stdout, stderr = execute('ssh {user}@{frontend} {slurm} ; scancel {job_id}'.format(**spec))
