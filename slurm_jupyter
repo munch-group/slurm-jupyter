@@ -45,7 +45,7 @@ slurm_script =  """#!/bin/sh
 #SBATCH -t {walltime}
 #SBATCH -o {tmp_dir}/{tmp_name}.%j.out
 #SBATCH -e {tmp_dir}/{tmp_name}.%j.err
-#SBATCH -J jptr
+#SBATCH -J {job_name}
 {account_spec}
 
 {sources_loaded}
@@ -202,7 +202,7 @@ def str_to_mb(s):
     memory_per_cpu_mb = int(s[:-1])
     if scale == 'g':
         memory_per_cpu_mb *= 1024
-    if scale == 'k':
+    if scale == 'm':
         memory_per_cpu_mb /= 1024.0
     return memory_per_cpu_mb
 
@@ -223,76 +223,87 @@ def print_memory_status(spec):
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-f", "--frontend", dest="frontend", type=str, default="login.genome.au.dk", help="url to frontend")
+parser.add_argument("-f", "--frontend", 
+                  dest="frontend", 
+                  type=str, 
+                  default="login.genome.au.dk", 
+                  help="URL to cluster frontend.")
 parser.add_argument("-A", "--account",
                   dest="account",
                   type=str,
                   default=None,
-                  help="Account/Project to run under")
+                  help="Account/Project to run under. This is typically the name of the shared folder you work in. Not specifying an account decreases your priority in the cluster queue.")
 parser.add_argument("-q", "--queue",
                   dest="queue",
                   type=str,
+                  choices=['normal', 'express', 'fat1', 'fat2'],
                   default="normal",
-                  help="Number of nodes")
+                  help="Cluster queue to submit to.")
 parser.add_argument("-n", "--nodes",
                   dest="nodes",
                   type=int,
                   default=1,
-                  help="Number of nodes")
+                  help="Number of nodes (machines) to allocate.")
 parser.add_argument("-c", "--cores",
                   dest="cores",
                   type=int,
                   default=1,
-                  help="Number of cores. Only for multiprocessing.")
+                  help="Number of cores. For multiprocessing or for running more than one notebook simultaneously.")
 parser.add_argument("-t", "--time",
                   dest="time",
                   type=str,
                   default="1-00:00:00",
-                  help="Max wall time: HH:MM:SS")
+                  help="Max wall time. specify as HH:MM:SS (or any other format supported by the cluster). The jupyter server is killed automatically after this time.")
 parser.add_argument("-N", "--name",
                   dest="name",
                   type=str,
-                  default="jptr",
-                  help="Name of job")
+                  default="jptr_{}_{}".format(getpass.getuser(), int(time.time())),
+                  help="Name of job. Only needed if you run multiple servers and want to be able to recognize a particular one in the cluster queue.")
 parser.add_argument("-u", "--user",
                   dest="user",
                   type=str,
                   default=getpass.getuser(),
-                  help="User name")
+                  help="User name on the cluster. Only needed if your user name on the cluster is different from the one you use on your own computer.")
 parser.add_argument("--port",
                   dest="port",
                   type=int,
                   default=None,
-                  help="local port")
+                  help="Local port for port forwarding")
 parser.add_argument("--hostport",
                   dest="hostport",
                   type=int,
                   default=None,
-                  help="port on cluster")
+                  help="Remote port (on the cluster) for port forwarding")
 parser.add_argument("-e", "--environment",
                   dest="environment",
                   type=str,
                   default='',
-                  help="environment")
+                  help="Conda environment to run jupyter in.")
 parser.add_argument("--timeout",
                   dest="timeout",
                   default=0.1,
                   type=float,
                   help="Time out in seconds for cross thread operations")
+parser.add_argument("--ipcluster",
+                  dest="ipcluster",
+                  action='store_true',
+                  default=False,
+                  help="Start an ipcluster")
 parser.add_argument("-v", "--verbose",
                   dest="verbose",
                   action='store_true',
                   help="Print debugging information")
 
-group = parser.add_mutually_exclusive_group(required=True)
+group = parser.add_mutually_exclusive_group(required=False)
 group.add_argument("--memory-per-cpu",
                   dest="memory_per_cpu",
                   type=str,
-                  help="Max memory for each core e.g. 4G")
+                  default='8G',
+                  help="Max memory for each core in gigabytes or megabytes e.g. 4g or 50m")
 group.add_argument("-m", "--total-memory",
                   dest="total_memory",
                   type=str,
-                  help="Max memory total for all cores. e.g. 4G")
+                  help="Max memory total for all cores in gigabytes or megabytes . e.g. 4g or 50m")
 
 args = parser.parse_args()
 
@@ -316,13 +327,14 @@ spec = {'user': args.user,
         'tmp_name': 'slurm_jupyter',
         'tmp_dir': '.slurm_jupyter',
         'frontend': args.frontend,
-        'hostport': args.port,
+        'hostport': args.hostport,
+        'job_name': args.name,
         'job_id': None }
 
-if args.port is None:
+if spec['port'] is None:
     spec['port'] = get_cluster_uid(spec)
 
-if args.hostport is None:
+if spec['hostport'] is None:
     spec['hostport'] = get_cluster_uid(spec)
 
 tup = spec['walltime'].split('-')
@@ -340,8 +352,11 @@ else:
 if args.environment:
     spec['environment'] = "\nsource deactivate\nsource activate " + args.environment
 
-spec['ipcluster'] = "ipcluster start -n {} &".format(args.cores)
-    
+if args.ipcluster:
+    spec['ipcluster'] = "ipcluster start -n {} &".format(args.cores)
+else:   
+    spec['ipcluster'] = ''
+
 if args.account:
     spec['account_spec'] = "#SBATCH -A {}".format(args.account)
 else:
@@ -361,6 +376,8 @@ try:
     run_event.set()
 
     print(RED+'Jupyter server: (to stop the server press Ctrl-C)'+ENDC)
+
+    time.sleep(5)
 
     stdout_p, stdout_t, stdout_q = open_stdout_connection(spec)
     stderr_p, stderr_t, stderr_q = open_stderr_connection(spec)
