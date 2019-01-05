@@ -18,6 +18,8 @@ Then run it like this:
 
     bash slurm_jupyter/cluster_config.sh
 
+It will ask about a lot of information. You can just press enter for all of them *except* when prompted for what password you want to use.
+
 ## Setup on your local machine
 
 If you have not done that yet, you need to set up your ssh connection to the cluster so you can connect securely without typing the password every time. First see if you have these two authentication files on your local machine:
@@ -41,9 +43,9 @@ From now on you can log into the cluster from your local machine without being p
 
 ## Run slurm_jupyter
 
-Running slurm_jupyter is easy. It has a lot of options that you can see like this:
+Put `slurm_jupyter` somewhere in your PATH and it like any other Python script. It has a lot of options that you can see like this:
 
-    python slurm_jupyter --help
+    slurm_jupyter --help
 
 If your username on the cluster (eg. donald) is different from that on your local machine you need to supply the that:
 
