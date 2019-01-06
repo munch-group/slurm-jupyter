@@ -35,7 +35,7 @@ Now use ssh to create a directory ~/.ssh on the cluster (assuming your username 
 
 Finally append the public key on your local machine to the file `.ssh/authorized_key`s on the cluster and enter the password one last time:
 
-    cat ~/.ssh/id_rsa.pub | ssh X@login.genome.au.dk 'cat >> .ssh/authorized_keys'
+    cat ~/.ssh/id_rsa.pub | ssh XXX@login.genome.au.dk 'cat >> .ssh/authorized_keys'
 
 From now on you can log into the cluster from your local machine without being prompted for a password.
 
