@@ -47,21 +47,28 @@ slurm_script =  """#!/bin/sh
 #SBATCH -e {tmp_dir}/{tmp_name}.%j.err
 #SBATCH -J {job_name}
 {account_spec}
-
 {sources_loaded}
-
 ##cd "{cwd}"
 
-export PATH=~/anaconda2/bin:~/anaconda/bin:$PATH
+# >>> conda initialize >>>
+# !! Contents within this block are managed by 'conda init' !!
+__conda_setup="$('$HOME/anaconda3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
+if [ $? -eq 0 ]; then
+    eval "$__conda_setup"
+else
+    if [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+        . "$HOME/anaconda3/etc/profile.d/conda.sh"
+    else
+        export PATH="$HOME/anaconda3/bin:$PATH"
+    fi
+fi
+unset __conda_setup
+# <<< conda initialize <<<
 
 {environment}
-
 {ipcluster}
-
 unset XDG_RUNTIME_DIR
-
-jupyter notebook --ip=0.0.0.0 --no-browser --port={hostport} --NotebookApp.iopub_data_rate_limit=10000000000
-
+jupyter {run} --ip=0.0.0.0 --no-browser --port={hostport} --NotebookApp.iopub_data_rate_limit=10000000000
 """
 
 # Ask for confirmation on keyboard interrupt
@@ -119,21 +126,26 @@ def wait_for_job_allocation(spec):
     time.sleep(20)
 
     # wait for job to start and get node it runs on 
-    regex = re.compile('Nodes\s+:\s+(\S+)')
-    cmd = 'ssh {user}@{frontend} {slurm} ; jobinfo {job_id}'.format(**spec)        
+    # regex = re.compile('Nodes\s+:\s+(\S+)')
+    # cmd = 'ssh {user}@{frontend} {slurm} ; jobinfo {job_id}'.format(**spec)        
+    # stdout, stderr = execute(cmd)
+    # if sys.version_info >= (3,0): stdout = stdout.decode()
+    # m = regex.search(stdout)
+    cmd = 'ssh {user}@{frontend} {slurm} ; squeue --noheader --format %N -j {job_id}'.format(**spec)        
     stdout, stderr = execute(cmd)
     if sys.version_info >= (3,0): stdout = stdout.decode()
-    m = regex.search(stdout)
+    node_id = stdout.strip()
 
-    while not m or m.group(1) == 'None':
+    while not node_id: #not m or m.group(1) == 'None':
         time.sleep(10)
         stdout, stderr = execute(cmd)
         if sys.version_info >= (3,0):
             stdout = stdout.decode()
-        m = regex.search(stdout)
+        # m = regex.search(stdout)
+        node_id = stdout.strip()
     if args.verbose: print(stdout)
 
-    node_id = m.group(1)
+    # node_id = m.group(1)
     return node_id
 
 
@@ -223,6 +235,12 @@ def print_memory_status(spec):
 
 
 parser = argparse.ArgumentParser()
+parser.add_argument("--run", 
+                  dest="run", 
+                  type=str, 
+                  choices=['notebook', 'lab'],
+                  default='notebook',
+                  help="URL to cluster frontend.")
 parser.add_argument("-f", "--frontend", 
                   dest="frontend", 
                   type=str, 
@@ -236,7 +254,7 @@ parser.add_argument("-A", "--account",
 parser.add_argument("-q", "--queue",
                   dest="queue",
                   type=str,
-                  choices=['normal', 'express', 'fat1', 'fat2'],
+                  choices=['normal', 'express', 'fat1', 'fat2', 'gpu'],
                   default="normal",
                   help="Cluster queue to submit to.")
 parser.add_argument("-n", "--nodes",
@@ -315,6 +333,7 @@ if args.nodes != 1:
 spec = {'user': args.user,
         'port': args.port,
         'environment': args.environment,
+        'run': args.run,
         'walltime': args.time,
         'account': args.account,
         'queue': args.queue,
