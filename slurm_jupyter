@@ -239,7 +239,7 @@ parser.add_argument("--run",
                   dest="run", 
                   type=str, 
                   choices=['notebook', 'lab'],
-                  default='notebook',
+                  default='lab',
                   help="URL to cluster frontend.")
 parser.add_argument("-f", "--frontend", 
                   dest="frontend", 
