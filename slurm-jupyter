@@ -11,6 +11,7 @@ import webbrowser
 import platform
 import argparse
 import signal
+from textwrap import wrap
 
 from subprocess import PIPE, Popen
 from threading  import Thread, Event, Timer
@@ -244,7 +245,11 @@ def memory_status(spec, max_proportion):
     process = Popen("ssh {user}@{frontend} ssh {user}@{node} python .slurm_jupyter/mem_jupyter.py".format(**spec).split(),
          stdout=PIPE, stderr=PIPE)
     stdout, stderr = process.communicate()
-    used_mem = int(stdout.decode().strip()) / 1024**2
+    try:
+        used_mem = int(stdout.decode().strip()) / 1024**2
+    except ValueError:
+        # if called after node shutdown stdout is "Node 's03n24.genomedk.net' not allocated to user(6358)!"
+        used_mem = -1 # if slurm job is killed and node is no longer allocated
 
     width = 50
     proportion = used_mem / reserved_mem
@@ -317,8 +322,16 @@ def memory_monitor(spec, thread):
             # This can happen when the function is interrupted halfway
             break
 
+description = """
+The script handles everyting required to run jupyter on the cluster but show the notebook or jupyterlab 
+in your local browser."""
 
-parser = argparse.ArgumentParser()
+not_wrapped = """See github.com/kaspermunch/slurm_jupyter for documentation and common use cases."""
+
+description = "\n".join(wrap(description.strip(), 80)) + "\n\n" + not_wrapped
+
+parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     description=description)
 parser.add_argument("--run", 
                   dest="run", 
                   type=str, 
