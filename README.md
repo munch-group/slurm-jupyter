@@ -14,7 +14,7 @@ You have to do some configuration of jupyter for the script to work. I have made
 
 Then run it like this:
 
-    bash slurm_jupyter/cluster_config.sh
+    bash slurm-jupyter/cluster_config.sh
 
 It will ask about a lot of information. You can just press enter for all of them *except* when prompted for what password you want to use.
 
@@ -39,25 +39,25 @@ Finally append the public key on your local machine to the file `.ssh/authorized
 
 From now on you can log into the cluster from your local machine without being prompted for a password.
 
-## Run slurm_jupyter
+## Run slurm-jupyter
 
 Put `slurm_jupyter` somewhere in your PATH or run it like any other Python script. It has a lot of options that you can see like this:
 
-    slurm_jupyter --help
+    slurm-jupyter --help
 
 If your username on the cluster (eg. donald) is different from that on your local machine, you need to supply the that:
 
-    slurm_jupyter -u donald -A monkey
+    slurm-jupyter -u donald -A monkey
 
 To start a Jupyter server under some project (say `monkey`), you just need to execute the script like this:
 
-    slurm_jupyter -u donald -A monkey
+    slurm-jupyter -u donald -A monkey
 
 To specify that you want 24g of memory and 3 cores, that you want jupyter to run in a conda environment called primates, and that you want jupyter to run for up to 11 hours before slurm cancels your job, you can execute it like this:
 
-    slurm_jupyter -u donald -A monkey -m 24g -c 3 -e primates -t 11:00:00
+    slurm-jupyter -u donald -A monkey -m 24g -c 3 -e primates -t 11:00:00
 
-When you run `slurm_jupyter`, it will connect to the cluster and write a script that it submits on the cluster queue. Once that script runs on a compute node, it starts the jupyter server for you. `slurm_jupyter` then opens connections so it can read the terminal output from jupyter and write it in the teminal of your local macine as it normally happens when you run jupyter. `slurm_jupyter`. It then forwards a port form the cluster to your local machine so you can see the jupyter web app in your local browser. The last thing it does is to open the Chrome browser and point it to the correct port.
+When you run `slurm-jupyter`, it will connect to the cluster and write a script that it submits on the cluster queue. Once that script runs on a compute node, it starts the jupyter server for you. `slurm-jupyter` then opens connections so it can read the terminal output from jupyter and write it in the teminal of your local macine as it normally happens when you run jupyter. `slurm-jupyter`. It then forwards a port form the cluster to your local machine so you can see the jupyter web app in your local browser. The last thing it does is to open the Chrome browser and point it to the correct port.
 
 The first time Chrome opens the connection to the cluster it will give you an error page saying “Your connection is not private”. You then need to click “Advanced” and then “Proceed to localhost (unsafe)”.  Then your file tree on the cluster should appear.
 
