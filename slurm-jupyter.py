@@ -6,6 +6,7 @@ import os
 import re
 import time
 import select
+import selectors
 import getpass
 import webbrowser
 import platform
@@ -171,27 +172,41 @@ def wait_for_job_allocation(spec):
     # node_id = m.group(1)
     return node_id
 
+'''
+mport selectors
+import subprocess
+import sys
+
+p = subprocess.Popen(
+    ["python", "random_out.py"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+)
+
+sel = selectors.DefaultSelector()
+sel.register(p.stdout, selectors.EVENT_READ)
+sel.register(p.stderr, selectors.EVENT_READ)
+
+while True:
+    for key, _ in sel.select():
+        data = key.fileobj.read1().decode()
+        if not data:
+            exit()
+        if key.fileobj is p.stdout:
+            print(data, end="")
+        else:
+            print(data, end="", file=sys.stderr)
+
+'''
 
 # read line without blocking
 def enqueue_output(out, queue):
-    if True:#on_windows():
-        fileno = out.fileno()
-        while run_event.is_set():
-            read_ready, _, _ = select.select([fileno], [], [], 0)
-            if read_ready:
-                c = out.readline()
-                queue.put(c)
-            time.sleep(.1)
-    else:
-        p = select.poll()
-        p.register(out)
-        while run_event.is_set():
-            if p.poll(1):
-                # c = out.read(1)
-                c = out.readline()
-                queue.put(c)
-            time.sleep(.1)
 
+    sel = selectors.DefaultSelector()
+    sel.register(out, selectors.EVENT_READ)
+    while True:
+        for key, _ in sel.select():
+            c = key.fileobj.readline()
+            queue.put(c)
+        time.sleep(.1)
 
 def open_stdout_connection(spec):
     cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.out'.format(**spec)
