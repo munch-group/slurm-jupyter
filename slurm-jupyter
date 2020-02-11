@@ -85,6 +85,10 @@ for proc in psutil.process_iter():
         pass
 """
 
+def on_windows():
+    return sys.platform == 'win32'
+
+
 # Ask for confirmation on keyboard interrupt
 def kbintr_handler(signal, frame):
     msg = BLUE+'\nAre you sure? y/n: '+ENDC
@@ -170,14 +174,22 @@ def wait_for_job_allocation(spec):
 
 # read line without blocking
 def enqueue_output(out, queue):
-    p = select.poll()
-    p.register(out)
-    while run_event.is_set():
-        if p.poll(1):
-            # c = out.read(1)
-            c = out.readline()
-            queue.put(c)
-        time.sleep(.1)
+    if on_windows():
+        while run_event.is_set():
+            read_ready, _, _ = select.select([out.fileno()], [], [], 0)
+            if read_ready:
+                c = out.readline()
+                queue.put(c)
+            time.sleep(.1)
+    else:
+        p = select.poll()
+        p.register(out)
+        while run_event.is_set():
+            if p.poll(1):
+                # c = out.read(1)
+                c = out.readline()
+                queue.put(c)
+            time.sleep(.1)
 
 
 def open_stdout_connection(spec):
