@@ -2,11 +2,6 @@
 
 You can run a jupyter notebook in your browser from a compute node on the cluster. This way your analysis runs on the file system where your data is, and you can keep data, code and documentation in one place. `slurm_jupyter` is a script that starts and connects to a jupyter server on compute note and forwards the web display to your local machine.  It only works using the Chrome browser.
 
-## Prerequisites
-Install [Anaconda python](https://www.anaconda.com/distribution/#download-section) your local machine. Say yes when asked if want to install Visual Studio Code. If you are on a Windows machine you also need to tick the box to add Anaconda python to your PATH when prompted. 
-
-> If you are on a Windows machine, you also need to download and the newest version of Powershell. You find see how to do that [on this page](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell-core-on-windows?view=powershell-7#msi) under "Installing the MSI package". Now open the newly installed Powershell and run: `conda init powershell`. Close Powershell and open it again. Now you have access to conda to create environments if you like.
-
 ## One-time setup on the cluster
 
 You need to install [miniconda](https://docs.conda.io/en/latest/miniconda.html) if you do not already have Anaconda Python installed in your cluster home dir. Run these commands in your cluster home dir. They will download and install miniconda for you. Say yes when it asks if it should run `conda init` for you.
@@ -29,6 +24,10 @@ Then run it like this:
 It will ask about a lot of information. You can just press enter for all of them *except* when prompted for what password you want to use.
 
 ## One-time setup on your local machine
+
+Install [Anaconda python](https://www.anaconda.com/distribution/#download-section) your local machine. Say yes when asked if want to install Visual Studio Code. If you are on a Windows machine you also need to tick the box to add Anaconda python to your PATH when prompted. 
+
+> If you are on a Windows machine, you also need to download and the newest version of Powershell. You find see how to do that [on this page](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell-core-on-windows?view=powershell-7#msi) under "Installing the MSI package". Now open the newly installed Powershell and run: `conda init powershell`. Close Powershell and open it again. Now you have access to conda to create environments if you like.
 
 If you have not done that yet, you need to set up your ssh connection to the cluster so you can connect securely without typing the password every time. First see if you have these two authentication files on your local machine:
 
