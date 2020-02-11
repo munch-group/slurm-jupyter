@@ -50,17 +50,17 @@ From now on you can log into the cluster from your local machine without being p
 
 ## Run slurm-jupyter
 
-Put `slurm_jupyter` somewhere in your PATH or run it like any other Python script. It has a lot of options that you can see like this:
+Put `slurm_jupyter.py` somewhere in your PATH or run it like any other Python script. It has a lot of options that you can see like this:
 
-    slurm-jupyter --help
+    slurm-jupyter.py --help
 
 If your username on the cluster (eg. donald) is different from that on your local machine, you need to supply the that. You also need to specify an environment to activate on the cluster that has jupyter installed (our `monkey` environment):
 
-    slurm-jupyter -u donald -e monkey
+    slurm-jupyter.py -u donald -e monkey
 
 To specify that you want 24g of memory and 3 cores, that you want jupyter to run in a conda environment called `monkey`, and that you want jupyter to run for up to 11 hours before slurm cancels your job, you can execute it like this:
 
-    slurm-jupyter -u donald -m 24g -c 3 -e monkey -t 11:00:00
+    slurm-jupyter.py -u donald -m 24g -c 3 -e monkey -t 11:00:00
 
 When you run `slurm-jupyter`, it will connect to the cluster and write a script that it submits on the cluster queue. Once that script runs on a compute node, it starts the jupyter server for you. `slurm-jupyter` then opens connections so it can read the terminal output from jupyter and write it in the teminal of your local macine as it normally happens when you run jupyter. `slurm-jupyter`. It then forwards a port form the cluster to your local machine so you can see the jupyter web app in your local browser. The last thing it does is to open the Chrome browser and point it to the correct port.
 
