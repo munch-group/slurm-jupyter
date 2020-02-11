@@ -202,7 +202,7 @@ def enqueue_output(out, queue):
 
     sel = selectors.DefaultSelector()
     sel.register(out, selectors.EVENT_READ)
-    while True:
+    while run_event.is_set():
         for key, _ in sel.select():
             c = key.fileobj.readline()
             queue.put(c)
