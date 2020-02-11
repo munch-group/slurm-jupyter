@@ -116,6 +116,8 @@ def submit_slurm_job(spec):
 
     cmd = 'ssh {user}@{frontend} cat - > {tmp_dir}/{tmp_script} ; mkdir -p {tmp_dir} ; {slurm} ; sbatch {tmp_dir}/{tmp_script} '.format(**spec)
         
+    if args.verbose: print("script ssh transfer:", cmd, sep='\n')
+
     script = slurm_script.format(**spec)
     if args.verbose: print("slurm script:", script, sep='\n')
 
