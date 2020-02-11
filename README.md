@@ -3,9 +3,9 @@
 You can run a jupyter notebook in your browser from a compute node on the cluster. This way your analysis runs on the file system where your data is, and you can keep data, code and documentation in one place. `slurm_jupyter` is a script that starts and connects to a jupyter server on compute note and forwards the web display to your local machine.  It only works using the Chrome browser.
 
 ## Prerequisites
-Install [Anaconda python](https://www.anaconda.com/distribution/#download-section) your local machine. Say yes when asked if want to install Visual Studio Code.
+Install [Anaconda python](https://www.anaconda.com/distribution/#download-section) your local machine. Say yes when asked if want to install Visual Studio Code. If you are on a Windows machine you also need to tick the box to add Anaconda python to your PATH when prompted. 
 
-> *If you are on a Windows machine* you also need to tick the box to add Anaconda python to your PATH when prompted. If you are on a Windows machine, you also need to download and the newest version of Powershell. You find see how to do that [on this page](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell-core-on-windows?view=powershell-7#msi) under "Installing the MSI package". Now open the newly installed Powershell and run: `conda init powershell`. Close Powershell and open it again. Now you have access to conda to create environments if you like.
+> If you are on a Windows machine, you also need to download and the newest version of Powershell. You find see how to do that [on this page](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell-core-on-windows?view=powershell-7#msi) under "Installing the MSI package". Now open the newly installed Powershell and run: `conda init powershell`. Close Powershell and open it again. Now you have access to conda to create environments if you like.
 
 ## One-time setup on the cluster
 
@@ -43,9 +43,9 @@ Now use ssh to create a directory ~/.ssh on the cluster (assuming your username 
 
     ssh donald@login.genome.au.dk mkdir -p .ssh
 
-Finally append the public key on your local machine to the file `.ssh/authorized_key`s on the cluster and enter the password one last time:
+Finally append the public key on your local machine to the file `.ssh/authorized_key`s on the cluster and enter the password one last time (replace `donald` with your cluster user name):
 
-    cat ~/.ssh/id_rsa.pub | ssh XXX@login.genome.au.dk 'cat >> .ssh/authorized_keys'
+    cat ~/.ssh/id_rsa.pub | ssh donald@login.genome.au.dk 'cat >> .ssh/authorized_keys'
 
 From now on you can log into the cluster from your local machine without being prompted for a password.
 
