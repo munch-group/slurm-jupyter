@@ -5,15 +5,7 @@ You can run a jupyter notebook in your browser from a compute node on the cluste
 ## Prerequisites
 Install [Anaconda python](https://www.anaconda.com/distribution/#download-section) your local machine. Say yes when asked if want to install Visual Studio Code.
 
-> When prompted tick the box to add Anaconda python to your PATH. Also 
-> 
-> You also need to download and the newest version of Powershell. You find see how to do that [on this page](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell-core-on-windows?view=powershell-7#msi) under "Installing the MSI package".
-
-> Now open the newly installed Powershell and run:
-
->    conda init powershell
-    
-> Close Powershell and open it again. Now you have access to conda to create environments if you like.
+> *If you are on a Windows machine* you also need to tick the box to add Anaconda python to your PATH when prompted. If you are on a Windows machine, you also need to download and the newest version of Powershell. You find see how to do that [on this page](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell-core-on-windows?view=powershell-7#msi) under "Installing the MSI package". Now open the newly installed Powershell and run: `conda init powershell`. Close Powershell and open it again. Now you have access to conda to create environments if you like.
 
 ## One-time setup on the cluster
 
