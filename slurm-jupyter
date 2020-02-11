@@ -125,12 +125,15 @@ def submit_slurm_job(spec):
     stdout, stderr = execute(cmd, stdin=script) # hangs untill submission
 
     # get stdour and stderr and get jobid
-    if sys.version_info >= (3,0): stdout = stdout.decode()
+    if sys.version_info >= (3,0):
+        stdout = stdout.decode()
+        stderr = stderr.decode()
     try:
         job_id = re.search('Submitted batch job (\d+)', stdout).group(1)
     except AttributeError:
         print(BLUE+'Slurm job submission failed'+ENDC)
         print(stdout)
+        print(stderr)
         sys.exit()
     print(BLUE+"Submitted slurm with job id:", job_id, ENDC)
 
