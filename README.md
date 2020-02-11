@@ -11,7 +11,7 @@ You need to install [miniconda](https://docs.conda.io/en/latest/miniconda.html) 
 
 You need to install jupyter and openssl on the cluster as well as any package you want to use in your jupyter notebooks. Create a conda environment with the most common packages for population genetics (replace `monkey` with something else): 
 
-        conda create --name myproject -c anaconda -c conda-forge -c bioconda python=3.7 biopython jupyter jupyterlab openssl matplotlib mpld3 nbconvert numpy pandas scipy seaborn statsmodels pyfaidx scikit-bio mygene msprime scikit-allel
+    conda create --name myproject -c anaconda -c conda-forge -c bioconda python=3.7 biopython jupyter jupyterlab openssl matplotlib mpld3 nbconvert numpy pandas scipy seaborn statsmodels pyfaidx scikit-bio mygene msprime scikit-allel
     
 You have to do some configuration of jupyter for the script to work. I have made a shell script that does that for you. Clone this repository to download the script to the cluster:
 
