@@ -1,23 +1,20 @@
 import setuptools, os, sys
 
-# with open("README.md", "r") as fh:
-#     long_description = fh.read()
-
-if sys.platform == 'win32':
-    # make an .exe file beside the actual script
-    os.environ['SETUPTOOLS_LAUNCHER'] = "executable"
+# if sys.platform == 'win32':
+#     # make an .exe file beside the actual script
+#     os.environ['SETUPTOOLS_LAUNCHER'] = "executable"
 
 setuptools.setup(
-    name="slurm_jupyter", # Replace with your own username
+    name="slurm_jupyter",
     version="1.0",
-    author="Kasper MUnch",
+    author="Kasper Munch",
     author_email="kaspermunch@birc.au.dk",
     description="Utility running jupyter on a slurm cluster.",
     # long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/kaspermunch/slurm_jupyter",
     packages=setuptools.find_packages(),
-    scripts=['slurm-jupyter'],
+    scripts=['slurm-jupyter.py'],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
