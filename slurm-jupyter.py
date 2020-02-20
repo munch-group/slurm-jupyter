@@ -197,21 +197,28 @@ while True:
 
 '''
 
-# read line without blocking
+ON_POSIX = 'posix' in sys.builtin_module_names
+#ON_POSIX  = os.name == 'posix'
+
 def enqueue_output(out, queue):
 
-    sel = selectors.DefaultSelector()
-    sel.register(out, selectors.EVENT_READ)
+    # sel = selectors.DefaultSelector()
+    # sel.register(out, selectors.EVENT_READ)
+    # while run_event.is_set():
+    #     for key, _ in sel.select():
+    #         c = key.fileobj.readline()
+    #         queue.put(c)
+    #     time.sleep(.1)
+
     while run_event.is_set():
-        for key, _ in sel.select():
-            c = key.fileobj.readline()
-            queue.put(c)
+        for line in iter(out.readline, b''):
+            queue.put(line)
         time.sleep(.1)
 
 def open_stdout_connection(spec):
     cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.out'.format(**spec)
     if args.verbose: print("stdout connection:", cmd)
-    stdout_p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=True)
+    stdout_p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=ON_POSIX)
     stdout_q = Queue()
     stdout_t = Thread(target=enqueue_output, args=(stdout_p.stdout, stdout_q))
     stdout_t.daemon = True # thread dies with the program
@@ -222,7 +229,7 @@ def open_stdout_connection(spec):
 def open_stderr_connection(spec):
     cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err'.format(**spec)
     if args.verbose: print("stderr connection:", cmd)
-    stderr_p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=True)
+    stderr_p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=ON_POSIX)
     stderr_q = Queue()
     stderr_t = Thread(target=enqueue_output, args=(stderr_p.stdout, stderr_q))
     stderr_t.daemon = True # thread dies with the program
