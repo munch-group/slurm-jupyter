@@ -11,8 +11,12 @@ You need to install [miniconda](https://docs.conda.io/en/latest/miniconda.html) 
 
 You need to install jupyter and openssl on the cluster as well as any package you want to use in your jupyter notebooks. Create a conda environment with the most common packages for population genetics (replace `monkey` with something else): 
 
-    conda create --name myproject -c anaconda -c conda-forge -c bioconda python=3.7 biopython jupyter jupyterlab openssl matplotlib mpld3 nbconvert numpy pandas scipy seaborn statsmodels pyfaidx scikit-bio mygene msprime scikit-allel
+    conda create --name myproject -c anaconda -c conda-forge -c bioconda python=3 biopython jupyter jupyterlab openssl matplotlib mpld3 nbconvert numpy pandas scipy seaborn statsmodels pyfaidx scikit-bio mygene msprime scikit-allel colorama
+
+As a minimum the environment should should have these libraries:
     
+    conda create --name myproject -c anaconda -c conda-forge python=3 jupyter jupyterlab openssl colorama 
+
 You have to do some configuration of jupyter for the script to work. I have made a shell script that does that for you. Clone this repository to download the script to the cluster:
 
     git clone https://github.com/kaspermunch/slurm_jupyter.git
@@ -48,7 +52,7 @@ Finally append the public key on your local machine to the file `.ssh/authorized
 
 From now on you can log into the cluster from your local machine without being prompted for a password.
 
-## Run slurm-jupyter
+## Run slurm-jupyter.py
 
 Put `slurm_jupyter.py` somewhere in your PATH or run it like any other Python script. It has a lot of options that you can see like this:
 
