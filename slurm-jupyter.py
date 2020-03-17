@@ -17,6 +17,9 @@ from textwrap import wrap
 from subprocess import PIPE, Popen
 from threading  import Thread, Event, Timer
 
+from colorama import init
+init()
+
 try:
     from Queue import Queue, Empty
 except ImportError:
@@ -518,6 +521,20 @@ if args.account:
     spec['account_spec'] = "#SBATCH -A {}".format(args.account)
 else:
     spec['account_spec'] = ""
+
+# test ssh connection:
+process = subprocess.Popen(
+    'ssh -q {user}@{frontend} exit'.format(**spec),
+    shell=True,
+    universal_newlines=True,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE)
+stdout, stderr = process.communicate()
+if process.returncode:
+    print("Cannot make ssh connection to cluster")
+    print(stdout)
+    print(stderr)
+    sys.exit()
 
 # incept keyboard interrupt with user prompt
 signal.signal(signal.SIGINT, kbintr_handler)
