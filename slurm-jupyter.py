@@ -203,6 +203,9 @@ while True:
 ON_POSIX = 'posix' in sys.builtin_module_names
 #ON_POSIX  = os.name == 'posix'
 
+#ssh -L6358:fe1.genomedk.net:6358 kmt@login.genome.au.dk
+#jupyter lab --ip=0.0.0.0 --no-browser --port=6358 --NotebookApp.iopub_data_rate_limit=10000000000
+
 def enqueue_output(out, queue):
 
     # sel = selectors.DefaultSelector()
@@ -491,6 +494,20 @@ spec = {'user': args.user,
         'job_name': args.name,
         'job_id': None }
 
+
+# test ssh connection:
+process = subprocess.Popen(
+    'ssh -q {user}@{frontend} exit'.format(**spec),
+    shell=True,
+    universal_newlines=True,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE)
+stdout, stderr = process.communicate()
+if process.returncode:
+    print("Cannot make ssh connection: {user}@{frontend}".format(**spec))
+    sys.exit()
+
+
 if spec['port'] is None:
     spec['port'] = get_cluster_uid(spec)
 
@@ -521,20 +538,6 @@ if args.account:
     spec['account_spec'] = "#SBATCH -A {}".format(args.account)
 else:
     spec['account_spec'] = ""
-
-# test ssh connection:
-process = subprocess.Popen(
-    'ssh -q {user}@{frontend} exit'.format(**spec),
-    shell=True,
-    universal_newlines=True,
-    stdout=subprocess.PIPE,
-    stderr=subprocess.PIPE)
-stdout, stderr = process.communicate()
-if process.returncode:
-    print("Cannot make ssh connection to cluster")
-    print(stdout)
-    print(stderr)
-    sys.exit()
 
 # incept keyboard interrupt with user prompt
 signal.signal(signal.SIGINT, kbintr_handler)
