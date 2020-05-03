@@ -46,13 +46,9 @@ As a minimum the environment should contain `jupyter`, `jupyterlab`, and `slurm-
     
     conda create --name myproject -c anaconda -c conda-forge -c kaspermunch python=3 jupyter jupyterlab slurm-jupyter
 
-You have to do some configuration of jupyter script to work. I have made a shell script that does that for you. Clone this repository to download the script to the cluster:
+You have to do some configuration of jupyter script to work. `slurm-jupyter` comes with a shell script that does that for you. Then run it like this:
 
-    git clone https://github.com/kaspermunch/slurm_jupyter.git
-
-Then run it like this:
-
-    bash slurm-jupyter/cluster_config.sh
+    config-slurm-jupyter.sh
 
 It will ask about a lot of information. You can just press enter for all of them *except* when prompted for what password you want to use.
 

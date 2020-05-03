@@ -6,7 +6,7 @@ import setuptools, os, sys
 
 setuptools.setup(
     name="slurm-jupyter",
-    version="1.0.2",
+    version="1.0.3",
     author="Kasper Munch",
     author_email="kaspermunch@birc.au.dk",
     description="Utility running jupyter on a slurm cluster.",
@@ -14,7 +14,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/kaspermunch/slurm-jupyter",
     packages=setuptools.find_packages(),
-    scripts=['slurm-jupyter.py'],
+    scripts=['slurm-jupyter.py', 'config-slurm-jupyter.sh'],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
