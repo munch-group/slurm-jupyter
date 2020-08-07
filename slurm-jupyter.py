@@ -589,7 +589,7 @@ try:
                 if 'SSLV3_ALERT_CERTIFICATE_UNKNOWN' not in line: # skip warnings about SSL certificate
                     print(line, end="")
 
-                if re.search('The Jupyter Notebook is running', line):
+                if re.search('Jupyter Notebook [\d.]+ is running', line):
                     port_p, port_t, port_q = open_port(spec)
 
                     open_chrome(spec)
