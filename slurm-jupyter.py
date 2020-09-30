@@ -527,7 +527,7 @@ else:
     spec['memory_spec'] = '#SBATCH --mem-per-cpu {}'.format(int(str_to_mb(args.memory_per_cpu)))
 
 if args.environment:
-    spec['environment'] = "\nsource activate " + args.environment
+    spec['environment'] = "\nconda activate " + args.environment
 
 if args.ipcluster:
     spec['ipcluster'] = "ipcluster start -n {} &".format(args.cores)
