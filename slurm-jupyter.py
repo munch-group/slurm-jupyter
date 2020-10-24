@@ -134,7 +134,7 @@ def get_cluster_uid(spec):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
-    uid = int(re.match('uid=(\d+)', stdout).group(1))
+    uid = int(re.search('uid=(\d+)', stdout).group(1))
     return uid
 
 
