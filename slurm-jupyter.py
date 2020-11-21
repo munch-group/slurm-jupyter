@@ -13,6 +13,7 @@ import platform
 import argparse
 import signal
 from textwrap import wrap
+from packaging import version
 
 from subprocess import PIPE, Popen
 from threading  import Thread, Event, Timer
@@ -94,18 +95,83 @@ unset XDG_RUNTIME_DIR
 jupyter {run} --ip=0.0.0.0 --no-browser --port={hostport} --NotebookApp.iopub_data_rate_limit=10000000000
 """
 
+
 mem_script = """
 import psutil
 import os
-for proc in psutil.process_iter():
+import time
+import sys
+
+def str_to_mb(s):
+    # compute mem in mb
+    scale = s[-1].lower()
+    assert scale in ['k', 'm', 'g']
+    memory_per_cpu_mb = float(s[:-1])
+    if scale == 'g':
+        memory_per_cpu_mb *= 1024
+    if scale == 'k':
+        memory_per_cpu_mb /= 1024.0
+    return memory_per_cpu_mb
+
+def memory_status(max_proportion):
+
+    used_mem, max_used_mem, reserved_mem = 0, 0, 0
+
+    if {memory_per_cpu}: # #######
+        reserved_mem = str_to_mb('{memory_per_cpu}') * {nr_cores} 
+    else:
+        reserved_mem = str_to_mb('{total_memory}')
+
+    used_mem = -1
+    for proc in psutil.process_iter():
+        try:
+            if '/job{job_id}/' in ' '. join(proc.cmdline()) and proc.username() == os.environ['USER']:            
+                # print(proc.cmdline())
+                used_mem = int(sum(c.memory_info().rss for c in proc.children(recursive=True)) ) / 1024**2
+                break
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            pass
+
+    width = 50
+    proportion = used_mem / reserved_mem
+    max_proportion = max(proportion, max_proportion)
+    n = int(round(proportion * width, 0))
+    m = int(round(max_proportion * width, 0))
+
+    # terminal colors
+    BLUE = '\\033[94m' # added an extra \ to make literal escape chars
+    RED = '\\033[91m'
+    ENDC = '\\033[0m'
+
+    n, m = m - (m - n), m - n
+    bar = '[' + '=' * n + '-' * m + ' ' * (width - n - m) + ']'
+
+    line = str(round(used_mem / 1024.0, 1)).rjust(6, ' ') + ' Gb ' + bar + str(round(reserved_mem / 1024.0, 1)) + ' Gb'
+    if proportion < 0.8:
+        color = BLUE
+    else:
+        color = RED
+    return proportion, color + line + ENDC
+
+max_proportion = 0
+prev_proportion = 0
+prev_time = 0
+while True:
+    time.sleep(5)
     try:
-        if '/job{job_id}/' in ' '. join(proc.cmdline()) and proc.username() == os.environ['USER']:            
-            # print(proc.cmdline())
-            print( sum(c.memory_info().rss for c in proc.children(recursive=True)) )
-            break
-    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-        pass
+        max_proportion = max(prev_proportion, max_proportion)
+        proportion, status_line = memory_status(max_proportion)
+        max_interval = 5 * 60
+        if abs(proportion - prev_proportion) > 0.1 or (time.time() - prev_time > max_interval):
+            prev_proportion = proportion
+            prev_time = time.time()
+            print(status_line, file=sys.stdout)
+            sys.stdout.flush()
+    except UnboundLocalError:
+        # This can happen when the function is interrupted halfway
+        break
 """
+
 
 def on_windows():
     return sys.platform == 'win32'
@@ -193,6 +259,7 @@ def wait_for_job_allocation(spec):
     # node_id = m.group(1)
     return node_id
 
+
 '''
 mport selectors
 import subprocess
@@ -218,30 +285,18 @@ while True:
 
 '''
 
-ON_POSIX = 'posix' in sys.builtin_module_names
-#ON_POSIX  = os.name == 'posix'
 
-#ssh -L6358:fe1.genomedk.net:6358 kmt@login.genome.au.dk
-#jupyter lab --ip=0.0.0.0 --no-browser --port=6358 --NotebookApp.iopub_data_rate_limit=10000000000
+ON_POSIX = 'posix' in sys.builtin_module_names
+
 
 def enqueue_output(out, queue):
-
-    # sel = selectors.DefaultSelector()
-    # sel.register(out, selectors.EVENT_READ)
-    # while run_event.is_set():
-    #     for key, _ in sel.select():
-    #         c = key.fileobj.readline()
-    #         queue.put(c)
-    #     time.sleep(.1)
-
     while run_event.is_set():
         for line in iter(out.readline, b''):
             queue.put(line)
         time.sleep(.1)
 
-def open_stdout_connection(spec):
-    cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.out'.format(**spec)
-    if args.verbose: print("stdout connection:", cmd)
+
+def open_stdout_connection(cmd, spec):
     stdout_p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=ON_POSIX)
     stdout_q = Queue()
     stdout_t = Thread(target=enqueue_output, args=(stdout_p.stdout, stdout_q))
@@ -250,15 +305,31 @@ def open_stdout_connection(spec):
     return stdout_p, stdout_t, stdout_q
 
 
-def open_stderr_connection(spec):
-    cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err'.format(**spec)
-    if args.verbose: print("stderr connection:", cmd)
+def open_stderr_connection(cmd, spec):
     stderr_p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=ON_POSIX)
     stderr_q = Queue()
     stderr_t = Thread(target=enqueue_output, args=(stderr_p.stdout, stderr_q))
     stderr_t.daemon = True # thread dies with the program
     stderr_t.start()
     return stderr_p, stderr_t, stderr_q
+
+
+def open_jupyter_stdout_connection(spec):
+    cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.out'.format(**spec)
+    if args.verbose: print("jupyter stdout connection:", cmd)
+    return open_stdout_connection(cmd, spec)
+
+
+def open_jupyter_stderr_connection(spec):
+    cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err'.format(**spec)
+    if args.verbose: print("jupyter stderr connection:", cmd)
+    return open_stderr_connection(cmd, spec)
+
+
+def open_memory_stdout_connection(spec):
+    cmd = 'ssh {user}@{frontend} ssh {user}@{node} python {tmp_dir}/mem_jupyter.py'.format(**spec)
+    if args.verbose: print("memory stdout connection:", cmd)
+    return open_stdout_connection(cmd, spec)
 
 
 def open_port(spec):
@@ -297,63 +368,24 @@ def str_to_mb(s):
     return memory_per_cpu_mb
 
 
-def memory_status(spec, max_proportion):
-
-    used_mem, max_used_mem, reserved_mem = 0, 0, 0
-
-    if args.memory_per_cpu:
-        reserved_mem = str_to_mb(args.memory_per_cpu) * spec['nr_cores'] 
-    else:
-        reserved_mem = str_to_mb(args.total_memory)
-
-    process = Popen("ssh {user}@{frontend} ssh {user}@{node} python .slurm_jupyter/mem_jupyter.py".format(**spec).split(),
-         stdout=PIPE, stderr=PIPE)
-    stdout, stderr = process.communicate()
-    try:
-        used_mem = int(stdout.decode().strip()) / 1024**2
-    except ValueError:
-        # if called after node shutdown stdout is "Node 's03n24.genomedk.net' not allocated to user(6358)!"
-        used_mem = -1 # if slurm job is killed and node is no longer allocated
-
-    width = 50
-    proportion = used_mem / reserved_mem
-    max_proportion = max(proportion, max_proportion)
-    n = int(round(proportion * width, 0))
-    m = int(round(max_proportion * width, 0))
-
-    n, m = m - (m - n), m - n
-    bar = '[' + '=' * n + '-' * m + ' ' * (width - n - m) + ']'
-    line = "{:>6.1f} Gb {} {:.1f} Gb".format(used_mem / 1024.0, bar,
-        reserved_mem / 1024.0)
-    if proportion < 0.8:
-        color = BLUE
-    else:
-        color = RED
-    return proportion, color + line + ENDC
-
-
-class StoppableThread(Thread):
-    """Thread class with a stop() method. The thread itself has to check
-    regularly for the stopped() condition."""
-
-    def __init__(self, target, args):
-
-        args += [self] # add self to function args to allow function to stop thraed
-
-        super(StoppableThread, self).__init__(target=target, args=args)
-        self._stop_event = Event()
-
-    def stop(self):
-        self._stop_event.set()
-
-    def stopped(self):
-        return self._stop_event.is_set()
+def check_for_conda_update():
+    cmd = 'conda search -c kaspermunch slurm-jupyter'
+    conda_search = subprocess.check_output(cmd.split()).decode()
+    newest_version = conda_search.strip().split('\n')[-1].split()[1]
+    cmd = 'conda list -f slurm-jupyter'
+    conda_search = subprocess.check_output(cmd.split()).decode()
+    this_version = conda_search.strip().split('\n')[-1].split()[1]
+    if version.parse(newest_version) > version.parse(this_version):
+        msg = '\nA newer version of slurm-jupyter exists ({}). To update run:\n'.format(newest_version)
+        msg += '\n\tconda update -c kaspermunch slurm-jupyter\n'
+        print(RED + msg + ENDC)
 
 
 def transfer_memory_script(spec):
 
     script = mem_script.format(**spec)
 
+    # cmd = 'ssh {user}@{frontend} cat - > {tmp_dir}/{mem_script} ; mkdir -p {tmp_dir}'.format(**spec)
     cmd = 'ssh {user}@{frontend} cat - > {tmp_dir}/{mem_script} ; mkdir -p {tmp_dir}'.format(**spec)
         
     if args.verbose: print("memory script:", script, sep='\n')
@@ -361,30 +393,6 @@ def transfer_memory_script(spec):
     if sys.version_info >= (3,0): script = script.encode()
     stdout, stderr = execute(cmd, stdin=script) # hangs untill submission
 
-
-def memory_monitor(spec, thread):
-
-    transfer_memory_script(spec)
-
-    max_proportion = 0
-    prev_proportion = 0
-    prev_time = 0
-    while True:
-        if thread.stopped():
-            break
-        time.sleep(10)
-        try:
-            max_proportion = max(prev_proportion, max_proportion)
-            proportion, status_line = memory_status(spec, max_proportion)
-            max_interval = 5 * 60
-            if abs(proportion - prev_proportion) > 0.1 or (time.time() - prev_time > max_interval):
-                prev_proportion = proportion
-                prev_time = time.time()
-                print(status_line, file=sys.stderr)
-                sys.stdout.flush()
-        except UnboundLocalError:
-            # This can happen when the function is interrupted halfway
-            break
 
 description = """
 The script handles everyting required to run jupyter on the cluster but show the notebook or jupyterlab 
@@ -500,6 +508,8 @@ spec = {'user': args.user,
         'queue': args.queue,
         'nr_nodes': args.nodes,
         'nr_cores': args.cores,
+        'memory_per_cpu': args.memory_per_cpu,
+        'total_memory': args.total_memory,
         'cwd': os.getcwd(),
         'sources_loaded': '',
         'slurm': 'source /com/extra/slurm/14.03.0/load.sh',
@@ -525,6 +535,7 @@ if process.returncode:
     print("Cannot make ssh connection: {user}@{frontend}".format(**spec))
     sys.exit()
 
+check_for_conda_update()
 
 if spec['port'] is None:
     spec['port'] = get_cluster_uid(spec)
@@ -576,13 +587,17 @@ try:
     time.sleep(5)
 
     # open connections to stdout and stderr from jupyter server
-    stdout_p, stdout_t, stdout_q = open_stdout_connection(spec)
-    stderr_p, stderr_t, stderr_q = open_stderr_connection(spec)
+    stdout_p, stdout_t, stdout_q = open_jupyter_stdout_connection(spec)
+    stderr_p, stderr_t, stderr_q = open_jupyter_stderr_connection(spec)
 
-    # start thread monitoring memory usage
-    mem_print_t = StoppableThread(target=memory_monitor, args=[spec])
-    mem_print_t.daemon = True # thread dies with the program
-    mem_print_t.start()
+    # open connections to stdout from memory monitoring script
+    transfer_memory_script(spec)
+    mem_stdout_p, mem_stdout_t, mem_stdout_q = open_memory_stdout_connection(spec)
+
+    # # start thread monitoring memory usage
+    # mem_print_t = StoppableThread(target=memory_monitor, args=[spec])
+    # mem_print_t.daemon = True # thread dies with the program
+    # mem_print_t.start()
 
     while True:
         while True:
@@ -595,6 +610,15 @@ try:
                     line = line.decode()
                 line = line.replace('\r', '\n')
                 print(line, end="")
+        while True:
+            try:  
+                mem_line = mem_stdout_q.get(timeout=args.timeout)#get_nowait()
+            except Empty:
+                break
+            else:
+                if sys.version_info >= (3,0):
+                    mem_line = mem_line.decode()
+                print(mem_line, end="")
         while True:
             try:  
                 line = stderr_q.get(timeout=args.timeout)#get_nowait()
@@ -642,8 +666,10 @@ except KeyboardInterrupt:
         pass
         
     try:
-        mem_print_t.stop()
-        mem_print_t.join()
+        mem_stdout_t.join()
+        mem_stdout_p.kill()
+        # mem_print_t.stop()
+        # mem_print_t.join()
     except:
         pass
 
