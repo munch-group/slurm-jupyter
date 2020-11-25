@@ -13,7 +13,7 @@ import platform
 import argparse
 import signal
 from textwrap import wrap
-from packaging import version
+from distutils.version import LooseVersion
 
 from subprocess import PIPE, Popen
 from threading  import Thread, Event, Timer
@@ -375,7 +375,7 @@ def check_for_conda_update():
     cmd = 'conda list -f slurm-jupyter'
     conda_search = subprocess.check_output(cmd.split()).decode()
     this_version = conda_search.strip().split('\n')[-1].split()[1]
-    if version.parse(newest_version) > version.parse(this_version):
+    if LooseVersion(newest_version) > LooseVersion(this_version):
         msg = '\nA newer version of slurm-jupyter exists ({}). To update run:\n'.format(newest_version)
         msg += '\n\tconda update -c kaspermunch slurm-jupyter\n'
         print(RED + msg + ENDC)
@@ -392,6 +392,22 @@ def transfer_memory_script(spec):
 
     if sys.version_info >= (3,0): script = script.encode()
     stdout, stderr = execute(cmd, stdin=script) # hangs untill submission
+
+
+# def slurm_jupyter_run():
+#         parser = argparse.ArgumentParser()
+#         parser.add_argument('-n', '--name', action="store", help='Provides name')
+#         args = parser.parse_args()
+
+#         say_hello(args.name)
+
+# def slurm_jupyter():
+#         parser = argparse.ArgumentParser()
+#         parser.add_argument('-n', '--name', action="store", help='Provides name')
+#         args = parser.parse_args()
+
+#         say_hello(args.name)
+
 
 
 description = """
