@@ -626,7 +626,7 @@ def slurm_jupyter_run():
     parser.add_argument("--cleanup",
                     dest="cleanup",
                     action='store_true',
-                    help="Removes un-executed notebooks generated using --parameters and format other than 'notebook'")                           
+                    help="Removes un-executed notebooks generated using --spike and format other than 'notebook'")                           
 
     parser.add_argument("-s", "--spike",
                     dest="spike",
@@ -634,7 +634,8 @@ def slurm_jupyter_run():
                     help="Adds a cell loading python code from file")       
     parser.add_argument("--replace-first-run-magic",
                     dest="replace_first_run_magic",
-                    help="Replace first cell with a %run magic instead of just adding a top %run magic cell") 
+                    action='store_true',
+                    help="Replace first cell with a %%run magic instead of just adding a top %%run magic cell") 
 
     parser.add_argument("-v", "--verbose",
                     dest="verbose",
@@ -654,8 +655,8 @@ def slurm_jupyter_run():
         print('Only not use --inplace with other formats than "notebook" format')
         sys.exit()
 
-    if args.cleanup and not args.parameters:
-        print("Only use --cleanup with --parameters")
+    if args.cleanup and not args.spike:
+        print("Only use --cleanup with --spike")
         sys.exit()
 
     home = os.path.expanduser("~")
@@ -713,7 +714,7 @@ def slurm_jupyter_run():
     else:
         spec['allow_errors'] = ''
 
-    if args.inplace or args.parameters and args.format == 'notebook':
+    if args.inplace or args.spike and args.format == 'notebook':
         spec['inplace'] = '--inplace'
     else:
         spec['inplace'] = ''
@@ -746,7 +747,7 @@ def slurm_jupyter_run():
                     nb = nbformat.read(f, as_version=4)
                 for i in range(len(nb.cells)):
                     cell = nb.cells[i]
-                    if '%run' in cell.source:
+                    if r'%run' in cell.source:
                         cell_idx = i
                         break
                 else:
@@ -784,4 +785,4 @@ def slurm_jupyter_run():
 
             command_list = [param_nbconvert_cmd.format(notebook=notebook, **spec) for notebook in new_notebook_list]
             spec['commands'] = ' && '.join(command_list)
-            # submit_slurm_batch_job(spec, verbose=args.verbose)
+            submit_slurm_batch_job(spec, verbose=args.verbose)
