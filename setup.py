@@ -11,7 +11,7 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setuptools.setup(
-    name="slurmjupyter",
+    name="slurm-jupyter",
     version="2.0.0",
     author="Kasper Munch",
     author_email="kaspermunch@birc.au.dk",
@@ -23,7 +23,7 @@ setuptools.setup(
     scripts=['config-slurm-jupyter.sh'],
     entry_points = {
         'console_scripts': ['slurm-jupyter=slurmjupyter:slurm_jupyter',
-                            'slurm-jupyter-run=slurmjupyter:slurm_jupyter_run']
+                            'slurm-nb-run=slurmjupyter:slurm_nb_run']
     },    
     classifiers=[
         "Programming Language :: Python :: 3",
