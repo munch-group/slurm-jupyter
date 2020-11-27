@@ -11,20 +11,20 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setuptools.setup(
-    name="slurm-jupyter",
-    version="1.0.8",
+    name="slurmjupyter",
+    version="2.0.0",
     author="Kasper Munch",
     author_email="kaspermunch@birc.au.dk",
     description="Utility running jupyter on a slurm cluster.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/kaspermunch/slurm-jupyter",
+    url="https://github.com/kaspermunch/slurmjupyter",
     packages=setuptools.find_packages(),
-    scripts=['slurm-jupyter.py', 'config-slurm-jupyter.sh'],
-    # entry_points = {
-    #     'console_scripts': ['slurm-jupyter=slurmjupyter.slurm_jupyter',
-    #                         'config-slurm-jupyter=slurmjupyter.config_slurm_jupyter']
-    # },
+    scripts=['config-slurm-jupyter.sh'],
+    entry_points = {
+        'console_scripts': ['slurm-jupyter=slurmjupyter:slurm_jupyter',
+                            'slurm-jupyter-run=slurmjupyter:slurm_jupyter_run']
+    },    
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
@@ -33,7 +33,7 @@ setuptools.setup(
     python_requires='>=3.6',
     install_requires=[
           'colorama',
-          'openssl',
+          'pyopenssl',
     ])
 
 # python3 setup.py sdist bdist_wheel
