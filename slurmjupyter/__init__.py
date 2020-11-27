@@ -70,6 +70,8 @@ if sys.version_info < (3,0):
 
 
 def check_for_conda_update():
+    """Checks for a more recent conda version and prints a message.
+    """
     cmd = 'conda search -c kaspermunch slurm-jupyter'
     conda_search = subprocess.check_output(cmd.split()).decode()
     newest_version = conda_search.strip().split('\n')[-1].split()[1]
@@ -84,6 +86,7 @@ def check_for_conda_update():
 
 # Ask for confirmation on keyboard interrupt
 def kbintr_handler(signal, frame):
+
     msg = BLUE+'\nAre you sure? y/n: '+ENDC
     try:
         if input(msg) == 'y':
@@ -97,7 +100,14 @@ def kbintr_repressor(signal, frame):
 
 
 def get_cluster_uid(spec):
+    """Gets id of user on the cluster.
 
+    Args:
+        spec (dict): Parameter specification.
+
+    Returns:
+        int: User id.
+    """
     process = subprocess.Popen(
         'ssh {user}@{frontend} id'.format(**spec),
         shell=True,
@@ -110,6 +120,15 @@ def get_cluster_uid(spec):
 
 
 def submit_slurm_server_job(spec, verbose=False):
+    """Submits slurm job that runs jupyter server.
+
+    Args:
+        spec (dict): Parameter specification.
+        verbose (bool, optional): Verbose if True. Defaults to False.
+
+    Returns:
+        str: Slurm job id.
+    """
 
     cmd = 'ssh {user}@{frontend} cat - > {tmp_dir}/{tmp_script} ; mkdir -p {tmp_dir} ; {slurm} ; sbatch {tmp_dir}/{tmp_script} '.format(**spec)
         
@@ -138,6 +157,15 @@ def submit_slurm_server_job(spec, verbose=False):
 
 
 def submit_slurm_batch_job(spec, verbose=False):
+    """Submits slurm job that runs batch job.
+
+    Args:
+        spec (dict): Parameter specification.
+        verbose (bool, optional): Verbose if True. Defaults to False.
+
+    Returns:
+        str: Slurm job id.
+    """
 
     script = slurm_batch_script.format(**spec)
     if verbose: print("slurm script:", script, sep='\n')
@@ -152,7 +180,7 @@ def submit_slurm_batch_job(spec, verbose=False):
     cmd = '{slurm} && sbatch {tmp_dir}/{tmp_script} '.format(**spec)
     if verbose: print("command:", cmd, sep='\n')
    
-    stdout, stderr = execute(cmd) # hangs untill submission
+    stdout, stderr = execute(cmd, shell=True) # hangs untill submission
 
     # get stdour and stderr and get jobid
     if sys.version_info >= (3,0):
@@ -171,6 +199,15 @@ def submit_slurm_batch_job(spec, verbose=False):
 
 
 def wait_for_job_allocation(spec, verbose=False):
+    """Waits for slurm job to run.
+
+    Args:
+        spec (dict): Parameter specification.
+        verbose (bool, optional): Verbose if True. Defaults to False.
+
+    Returns:
+        str: Id of node running job.
+    """
     # wait a bit to make sure jobinfo database is updated
     time.sleep(20)
 
@@ -193,6 +230,12 @@ def wait_for_job_allocation(spec, verbose=False):
 
 
 def enqueue_output(out, queue):
+    """Enqueues output from stream.
+
+    Args:
+        out (io.TextIOWrapper): Input stream.
+        queue (Queue.Queue): The queue to add input from stream to.
+    """
     while RUN_EVENT.is_set():
         for line in iter(out.readline, b''):
             queue.put(line)
@@ -208,13 +251,13 @@ def open_stdout_connection(cmd, spec):
     return stdout_p, stdout_t, stdout_q
 
 
-def open_stderr_connection(cmd, spec):
-    stderr_p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=ON_POSIX)
-    stderr_q = Queue()
-    stderr_t = Thread(target=enqueue_output, args=(stderr_p.stdout, stderr_q))
-    stderr_t.daemon = True # thread dies with the program
-    stderr_t.start()
-    return stderr_p, stderr_t, stderr_q
+# def open_stderr_connection(cmd, spec):
+#     stderr_p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=ON_POSIX)
+#     stderr_q = Queue()
+#     stderr_t = Thread(target=enqueue_output, args=(stderr_p.stdout, stderr_q))
+#     stderr_t.daemon = True # thread dies with the program
+#     stderr_t.start()
+#     return stderr_p, stderr_t, stderr_q
 
 
 def open_jupyter_stdout_connection(spec, verbose=False):
@@ -226,7 +269,7 @@ def open_jupyter_stdout_connection(spec, verbose=False):
 def open_jupyter_stderr_connection(spec, verbose=False):
     cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err'.format(**spec)
     if verbose: print("jupyter stderr connection:", cmd)
-    return open_stderr_connection(cmd, spec)
+    return open_stdout_connection(cmd, spec)
 
 
 def open_memory_stdout_connection(spec, verbose=False):
@@ -566,31 +609,7 @@ def slurm_jupyter():
         sys.exit()
 
 
-##################################
-
-import json, copy
-
-def parse_parameter_notebook(notebook_json):
-
-    spike_in_cells = list()
-    suffixes = list()
-    for cell in notebook_json['cells']:
-        if cell['cell_type'] == 'code':
-            spike_in_cell = {'cell_type': 'code', 'execution_count': 0, 'metadata': {}, 
-                'outputs': [], 'source': cell['source']}
-            spike_in_cells.append(spike_in_cell)
-        if cell['cell_type'] == 'raw':
-            name = cell['source'][0].split()
-            assert len(name) == 1
-            suffixes.append(name[0])
-
-    if not suffixes or not len(spike_in_cells) == len(suffixes):
-        suffixes = list(map(str, range(len(spike_in_cells))))
-
-    return spike_in_cells, suffixes
-    
-
-def slurm_jupyter_run():
+def slurm_nb_run():
 
     description = """
     The script executes a notebook on the cluster"""
@@ -719,8 +738,6 @@ def slurm_jupyter_run():
     else:
         spec['inplace'] = ''
 
-
-
     nbconvert_cmd = "jupyter nbconvert --ClearOutputPreprocessor.enabled=True --ExecutePreprocessor.timeout={timeout} {allow_errors} {inplace} --to {format} --execute {notebook}"
 
     notebook_list = args.notebooks
@@ -736,7 +753,7 @@ def slurm_jupyter_run():
         for spike_file in args.spike:
 
             # new cell to add/replace:
-            new_cell_source = '%run {}'.format(spike_file)
+            new_cell_source = '%run {}'.format(os.path.abspath(spike_file))
 
             new_notebook_list = list()
 
