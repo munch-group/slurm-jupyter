@@ -27,7 +27,7 @@ except ImportError:
     from queue import Queue, Empty  # python 3.x
 
 from .templates import slurm_server_script, slurm_batch_script, mem_script
-from .utils import execute, modpath, on_windows, str_to_mb
+from .utils import execute, modpath, on_windows, str_to_mb, seconds2string
 
 # global run event to communicate with threads
 RUN_EVENT = None
@@ -63,10 +63,6 @@ ON_POSIX = 'posix' in sys.builtin_module_names
 #             print(data, end="")
 #         else:
 #             print(data, end="", file=sys.stderr)
-
-
-if sys.version_info < (3,0):
-    input = raw_input
 
 
 def check_for_conda_update():
@@ -172,9 +168,6 @@ def submit_slurm_batch_job(spec, verbose=False):
 
     script = slurm_batch_script.format(**spec)
     if verbose: print("slurm script:", script, sep='\n')
-
-    # if sys.version_info >= (3,0):
-    #     script = script.encode()
 
     tmp_script_path = "{tmp_dir}/{tmp_script}".format(**spec)
     with open(tmp_script_path, 'w') as f:
@@ -536,7 +529,7 @@ def slurm_jupyter():
         days, (hours, mins, secs) = 0, tup[0].split(':')
     else:
         days, (hours, mins, secs) = tup[0], tup[1].split(':')
-    end_time = time.time() + int(days) * 86400 + int(hours) * 3600 + int(mins) * 60 + int(secs)
+    end_time = int(time.time()) + int(days) * 86400 + int(hours) * 3600 + int(mins) * 60 + int(secs)
 
     if args.total_memory:
         spec['memory_spec'] = '#SBATCH --mem {}'.format(int(str_to_mb(args.total_memory)))
@@ -595,8 +588,7 @@ def slurm_jupyter():
                 except Empty:
                     break
                 else:
-                    if sys.version_info >= (3,0):
-                        line = line.decode()
+                    line = line.decode()
                     line = line.replace('\r', '\n')
                     print(line, end="")
             while True:
@@ -605,17 +597,18 @@ def slurm_jupyter():
                 except Empty:
                     break
                 else:
-                    if sys.version_info >= (3,0):
-                        mem_line = mem_line.decode()
-                    print(mem_line, end="")
+                    mem_line = mem_line.decode().rstrip() 
+                    secs_left = end_time - int(time.time())
+                    color = secs_left > 600 and BLUE or RED
+                    mem_line += '\t'+color+'Time: '+seconds2string(secs_left)+ENDC
+                    print(mem_line)
             while True:
                 try:  
                     line = stderr_q.get(timeout=args.timeout)#get_nowait()
                 except Empty:
                     break
                 else:
-                    if sys.version_info >= (3,0):
-                        line = line.decode()
+                    line = line.decode()
                     line = line.replace('\r', '\n')
                     if 'SSLV3_ALERT_CERTIFICATE_UNKNOWN' not in line: # skip warnings about SSL certificate
                         print(line, end="")

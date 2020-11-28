@@ -2,6 +2,21 @@ import os
 import sys
 from subprocess import PIPE, Popen
 
+def seconds2string(sec):
+    """Convert seconds to slurm time spec.
+
+    Args:
+        sec (int): Seconds
+
+    Returns:
+        str: slurm time spec string (days-hours:mins:secs)
+    """
+    days, sec = sec // 86400, sec % 86400
+    hours, sec = sec // 3600, sec % 3600
+    minutes, seconds  = sec // 60, sec % 60
+    return f'{days}-{hours:02}:{minutes:02}:{seconds:02}'
+
+
 def execute(cmd, stdin=None, shell=False):
     """Executes a system command line.
 
