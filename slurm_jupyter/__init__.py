@@ -86,7 +86,8 @@ def check_for_conda_update():
 
 # Ask for confirmation on keyboard interrupt
 def kbintr_handler(signal, frame):
-
+    """Intercepts KeyboardInterrupt and asks for confirmation.
+    """
     msg = BLUE+'\nAre you sure? y/n: '+ENDC
     try:
         if input(msg) == 'y':
@@ -96,6 +97,8 @@ def kbintr_handler(signal, frame):
 
 
 def kbintr_repressor(signal, frame):
+    """For ignoring KeyboardInterrupt.
+    """
     pass
 
 
@@ -242,43 +245,82 @@ def enqueue_output(out, queue):
         time.sleep(.1)
 
 
-def open_stdout_connection(cmd, spec):
-    stdout_p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=ON_POSIX)
-    stdout_q = Queue()
-    stdout_t = Thread(target=enqueue_output, args=(stdout_p.stdout, stdout_q))
-    stdout_t.daemon = True # thread dies with the program
-    stdout_t.start()
-    return stdout_p, stdout_t, stdout_q
+def open_output_connection(cmd, spec):
+    """Opens connection to stdout of a command and makes a thread where output is enqueued.
 
+    Args:
+        cmd (str): Command.
+        spec (dict): Parameter specification.
 
-# def open_stderr_connection(cmd, spec):
-#     stderr_p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=ON_POSIX)
-#     stderr_q = Queue()
-#     stderr_t = Thread(target=enqueue_output, args=(stderr_p.stdout, stderr_q))
-#     stderr_t.daemon = True # thread dies with the program
-#     stderr_t.start()
-#     return stderr_p, stderr_t, stderr_q
+    Returns:
+        (subprocess.Popen, threading.Thread, Queue.Queue): Process, Thread and Queue.
+    """      
+    p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=ON_POSIX)
+    q = Queue()
+    t = Thread(target=enqueue_output, args=(p.stdout, q))
+    t.daemon = True # thread dies with the program
+    t.start()
+    return p, t, q
 
 
 def open_jupyter_stdout_connection(spec, verbose=False):
+    """Opens connection to stdout of a to a tail command on the cluster reading stdout from jupyter. 
+    Makes a thread where output is enqueued.
+
+    Args:
+        cmd (str): Command.
+        spec (dict): Parameter specification.
+
+    Returns:
+        (subprocess.Popen, threading.Thread, Queue.Queue): Process, Thread and Queue.
+    """       
     cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.out'.format(**spec)
     if verbose: print("jupyter stdout connection:", cmd)
-    return open_stdout_connection(cmd, spec)
+    return open_output_connection(cmd, spec)
 
 
 def open_jupyter_stderr_connection(spec, verbose=False):
+    """Opens connection to stderr of a to a tail command on the cluster reading stderr from jupyter. 
+    Makes a thread where output is enqueued.
+
+    Args:
+        cmd (str): Command.
+        spec (dict): Parameter specification.
+
+    Returns:
+        (subprocess.Popen, threading.Thread, Queue.Queue): Process, Thread and Queue.
+    """      
     cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err'.format(**spec)
     if verbose: print("jupyter stderr connection:", cmd)
-    return open_stdout_connection(cmd, spec)
+    return open_output_connection(cmd, spec)
 
 
 def open_memory_stdout_connection(spec, verbose=False):
+    """Opens connection to stdout from python script on the cluster producing memory status.
+    Makes a thread where output is enqueued.
+
+    Args:
+        cmd (str): Command.
+        spec (dict): Parameter specification.
+
+    Returns:
+        (subprocess.Popen, threading.Thread, Queue.Queue): Process, Thread and Queue.
+    """     
     cmd = 'ssh {user}@{frontend} ssh {user}@{node} python {tmp_dir}/mem_jupyter.py'.format(**spec)
     if verbose: print("memory stdout connection:", cmd)
-    return open_stdout_connection(cmd, spec)
+    return open_output_connection(cmd, spec)
 
 
 def open_port(spec, verbose=False):
+    """Opens port to cluster node so that Jupyter is forwarded to localhost.
+
+    Args:
+        spec (dict): Parameter specification.
+        verbose (bool, optional): Verbose if True. Defaults to False.
+
+    Returns:
+        (subprocess.Popen, threading.Thread, Queue.Queue): Process, Thread and Queue.
+    """
     cmd = 'ssh -L{port}:{node}.genomedk.net:{hostport} {user}@{frontend}'.format(**spec)
     if verbose: print("forwarding port:", cmd)
     port_p = Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
@@ -293,6 +335,11 @@ def open_port(spec, verbose=False):
 
 
 def open_chrome(spec):
+    """Opens Chrome on localhost and port.
+
+    Args:
+        spec (dict): Parameter specification.
+    """
     if platform.platform().startswith('Darwin'):
         chrome_path = 'open -a /Applications/Google\ Chrome.app %s'
     else:
@@ -303,7 +350,12 @@ def open_chrome(spec):
 
 
 def transfer_memory_script(spec, verbose=False):
+    """Transvers the a python script to the cluster, which monitors memory use on the node.
 
+    Args:
+        spec (dict): Parameter specification.
+        verbose (bool, optional): Verbose if True. Defaults to False.
+    """
     script = mem_script.format(**spec)
 
     # cmd = 'ssh {user}@{frontend} cat - > {tmp_dir}/{mem_script} ; mkdir -p {tmp_dir}'.format(**spec)
@@ -316,7 +368,11 @@ def transfer_memory_script(spec, verbose=False):
 
 
 def add_slurm_arguments(parser):
+    """Adds slurm-relevant command line arguments to parser.
 
+    Args:
+        parser (argparse.ArgumentParser): Argument parser to add arguments to.
+    """
     parser.add_argument("-c", "--cores",
                     dest="cores",
                     type=int,
@@ -325,7 +381,7 @@ def add_slurm_arguments(parser):
     parser.add_argument("-t", "--time",
                     dest="time",
                     type=str,
-                    default="08:00:00",
+                    default="05:00:00",
                     help="Max wall time. specify as HH:MM:SS (or any other format supported by the cluster). The jupyter server is killed automatically after this time.")
 
     group = parser.add_mutually_exclusive_group(required=False)
@@ -347,7 +403,7 @@ def add_slurm_arguments(parser):
     parser.add_argument("-q", "--queue",
                     dest="queue",
                     type=str,
-                    choices=['normal', 'express', 'fat1', 'fat2', 'gpu'],
+                    choices=['short', 'normal', 'express', 'fat2', 'gpu'],
                     default="normal",
                     help="Cluster queue to submit to.")
     parser.add_argument("-N", "--name",
@@ -383,7 +439,9 @@ def add_slurm_arguments(parser):
 
 
 def slurm_jupyter():
-        
+    """Command line script for use on a local machine. Runs and connects to a jupyter server on a slurm node.
+    """ 
+
     description = """
     The script handles everyting required to run jupyter on the cluster but show the notebook or jupyterlab 
     in your local browser."""
@@ -610,6 +668,16 @@ def slurm_jupyter():
 
 
 def slurm_nb_run():
+    """Command line script for use on the cluster. Executes notebooks on a slurm node. 
+    E.g. to execute one or more notebooks inplace on a slurm node:
+
+        slurm-nb-run --inplace notebook1.ipynb, notebook2.ipynb
+
+    To create and execute one or more notebooks with two different sets of parameters 
+    (param1.py and param2.py):
+
+        slurm-nb-run --spike param1.py --spike param2.py notebook1.ipynb, notebook2.ipynb
+    """
 
     description = """
     The script executes a notebook on the cluster"""
