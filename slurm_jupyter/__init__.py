@@ -26,7 +26,7 @@ try:
 except ImportError:
     from queue import Queue, Empty  # python 3.x
 
-from .script_templates import slurm_server_script, slurm_batch_script, mem_script
+from .templates import slurm_server_script, slurm_batch_script, mem_script
 from .utils import execute, modpath, on_windows, str_to_mb
 
 # global run event to communicate with threads
@@ -719,7 +719,7 @@ def slurm_nb_run():
                     dest="spike",
                     action='append',
                     help="Adds a cell loading python code from file")       
-    parser.add_argument("--replace-first-run-magic",
+    parser.add_argument("-r", "--replace-run-magic",
                     dest="replace_first_run_magic",
                     action='store_true',
                     help="Replace first cell with a %%run magic instead of just adding a top %%run magic cell") 

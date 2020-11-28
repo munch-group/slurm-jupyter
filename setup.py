@@ -22,8 +22,8 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     scripts=['config-slurm-jupyter.sh'],
     entry_points = {
-        'console_scripts': ['slurm-jupyter=slurmjupyter:slurm_jupyter',
-                            'slurm-nb-run=slurmjupyter:slurm_nb_run']
+        'console_scripts': ['slurm-jupyter=slurm_jupyter:slurm_jupyter',
+                            'slurm-nb-run=slurm_jupyter:slurm_nb_run']
     },    
     classifiers=[
         "Programming Language :: Python :: 3",
