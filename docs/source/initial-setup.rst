@@ -61,7 +61,7 @@ You need to install jupyter and openssl on the cluster as well as any package yo
 
     conda create --name myproject -c anaconda -c conda-forge -c bioconda python=3 biopython jupyter jupyterlab openssl matplotlib mpld3 nbconvert numpy pandas scipy seaborn statsmodels pyfaidx scikit-bio mygene msprime scikit-allel colorama
 
-As a minimum the environment should contain `jupyter`, `jupyterlab`, and `slurm-jupyter`:
+As a minimum the environment should contain `jupyter`, `jupyterlab`, `nbformat`, and `slurm-jupyter`:
     
 .. code-block:: bash
 
