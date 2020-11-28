@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import (absolute_import, division, print_function, unicode_literals)
+#from __future__ import (absolute_import, division, print_function, unicode_literals) # TODO: Remove this?
 import subprocess
 import sys
 import os
@@ -41,7 +41,7 @@ ENDC = '\033[0m'
 
 ON_POSIX = 'posix' in sys.builtin_module_names
 
-
+# TODO: Use this instead?
 # import selectors
 # import subprocess
 # import sys
@@ -500,7 +500,7 @@ def slurm_jupyter():
             'total_memory': args.total_memory,
             'cwd': os.getcwd(),
             'sources_loaded': '',
-            'slurm': 'source /com/extra/slurm/14.03.0/load.sh',
+            'slurm': 'source /com/extra/slurm/14.03.0/load.sh', # TODO: is this requierd???
             'mem_script': 'mem_jupyter.py',
             'tmp_script': 'slurm_jupyter_{}.sh'.format(int(time.time())),
             'tmp_name': 'slurm_jupyter',
