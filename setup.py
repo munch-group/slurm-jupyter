@@ -15,7 +15,7 @@ setuptools.setup(
     version="2.0.0",
     author="Kasper Munch",
     author_email="kaspermunch@birc.au.dk",
-    description="Utility running jupyter on a slurm cluster.",
+    description="Utilities for jupyter on a slurm cluster.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/kaspermunch/slurmjupyter",
@@ -34,6 +34,7 @@ setuptools.setup(
     install_requires=[
           'colorama',
           'pyopenssl',
+          'nbconvert'
     ])
 
 # python3 setup.py sdist bdist_wheel
