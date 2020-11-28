@@ -34,7 +34,7 @@ setuptools.setup(
     install_requires=[
           'colorama',
 #          'openssl',
-          'nbconvert'
+           'sphinx'
     ])
 
 # python3 setup.py sdist bdist_wheel
