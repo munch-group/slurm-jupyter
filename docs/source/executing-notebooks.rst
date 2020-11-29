@@ -41,7 +41,7 @@ When parameter settings apply to several notebooks (E.g. notebook1.ipynb and not
     cutoff = 5
     level = 1
 
-then you can load those parameters using the `%run` magic in a cell at the top of each notebook:
+then you can load those parameters using the `%run` `magic <https://ipython.readthedocs.io/en/stable/interactive/magics.html#magic-run>`_ in a cell at the top of each notebook:
 
 .. code-block:: python
 
@@ -59,7 +59,7 @@ or the shorter
 
     slurm-nb-run -s permissive.py -s strict.py -r notebook1.ipynb notebook1.ipynb
 
-That will create and execute notebooks in a directory structure like this:    
+This will create and execute notebooks in a directory structure like this:    
 
 .. code-block:: 
 
