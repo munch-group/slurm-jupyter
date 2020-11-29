@@ -8,9 +8,9 @@ You need to install the package on both your local machine and on the cluster yo
 On your local machine
 -----------------------------------------
 
-Install [Anaconda python](https://www.anaconda.com/distribution/#download-section) your local machine. Say yes when asked if want to install Visual Studio Code. If you are on a Windows machine you also need to tick the box to add Anaconda python to your PATH when prompted. 
+Install `Anaconda python <https://www.anaconda.com/distribution/#download-section>`_ on your local machine. Say yes when asked if want to install Visual Studio Code. If you are on a Windows machine you also need to tick the box to add Anaconda python to your PATH when prompted. 
 
-> If you are on a Windows machine, you also need to download and the newest version of Powershell. You find see how to do that [on this page](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell-core-on-windows?view=powershell-7#msi) under "Installing the MSI package". Now open the newly installed Powershell and run: `conda init powershell`. Close Powershell and open it again. Now you have access to conda to create environments if you like.
+> If you are on a Windows machine, you also need to download and the newest version of Powershell. You find see how to do that `on this page <(https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell-core-on-windows?view=powershell-7#msi>`_ under "Installing the MSI package". Now open the newly installed Powershell and run: `conda init powershell`. Close Powershell and open it again. Now you have access to conda to create environments if you like.
 
 Activate the environment you want to install in and do:
 
@@ -31,13 +31,13 @@ if not, you generate a pair of authentication keys like this. Do not enter a pas
 
     ssh-keygen -t rsa
 
-Now use ssh to create a directory ~/.ssh on the cluster (assuming your username on the cluster is `donald`):
+Now use ssh to create a directory ``~/.ssh`` on the cluster (assuming your username on the cluster is `donald`):
 
 .. code-block:: bash
 
     ssh donald@login.genome.au.dk mkdir -p .ssh
 
-Finally append the public key on your local machine to the file `.ssh/authorized_key`s on the cluster and enter the password one last time (replace `donald` with your cluster user name):
+Finally append the public key on your local machine to the file ``.ssh/authorized_keys`` on the cluster and enter the password one last time (replace `donald` with your cluster user name):
 
 .. code-block:: bash
 
@@ -48,7 +48,7 @@ From now on you can log into the cluster from your local machine without being p
 On the cluster
 -------------------------------
 
-You need to install [miniconda](https://docs.conda.io/en/latest/miniconda.html) if you do not already have Anaconda Python installed in your cluster home dir. Run these commands in your cluster home dir. They will download and install miniconda for you. Say yes when it asks if it should run `conda init` for you.
+You need to install `miniconda <https://docs.conda.io/en/latest/miniconda.html>`_ if you do not already have Anaconda Python installed in your cluster home dir. Run these commands in your cluster home dir. They will download and install miniconda for you. Say yes when it asks if it should run `conda init` for you.
 
 .. code-block:: bash
 

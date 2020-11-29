@@ -47,7 +47,7 @@ then you can load those parameters using the `%run` magic in a cell at the top o
 
     %run permissive.py
 
-Now say that you want to run your notebooks with several different sets of parameters (E.g. `permissive.py` and `strict.py`) to see how your analysis and plots look in each case. You can do that like this:
+Now say that you want to run your notebooks with several different sets of parameters (E.g. ``permissive.py`` and ``strict.py``) to see how your analysis and plots look in each case. You can do that like this:
 
 .. code-block:: bash
 
@@ -70,9 +70,9 @@ That will create and execute notebooks in a directory structure like this:
     │   ├── notebook2_permissive.ipynb
     │   └── notebook2_strict.ipynb
 
-In each notebook the first `%run` magic encountered will be replace to instead run one of the spiked python files. If you do not want to replace any of your existing `%run` magics, just omit the `-r` option:
+In each notebook the first ``%run`` magic encountered will be replace to instead run one of the spiked python files. If you do not want to replace any of your existing ``%run`` magics, just omit the ``-r`` option:
 
-.. code-block:: 
+.. code-block:: bash
 
     slurm-nb-run -s permissive.py -s strict.py notebook1.ipynb notebook1.ipynb
 

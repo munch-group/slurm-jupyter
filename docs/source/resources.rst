@@ -18,27 +18,27 @@ The default is a single core, but you can specify how many cores you want availa
 Running time
 ------------------
 
-The default time available on is 5 hours. If you want your to be allowed to run for up to 11 hours before slurm cancels your job, you can execute it like this using the `--time` or `-t` option:
+The default time available on is 5 hours. If you want your to be allowed to run for up to 11 hours before slurm cancels your job, you can execute it like this using the ``--time`` or ``-t`` option:
 
 .. code-block:: bash
 
     slurm-jupyter.py -t 11:00:00
 
-The time format is like this `days-hours:minutes:seconds`.
+The time format is like this: ``days-hours:minutes:seconds``.
 
 
 Memory
 ------------------
 
-The default amount of memory available is 8g. You can specify any other amount in kilo, mega or giga (k, m, or g). 
+The default amount of memory available is eight gigabytes. You can specify any other amount in kilo, mega or giga (k, m, or g). 
 
-To specify that you want 4g of memory available on the slurn node you use the `--total-memory` option (or its short form `-m`):
+To specify that you want 4g of memory available on the slurn node you use the ``--total-memory`` option (or its short form ``-m``):
 
 .. code-block:: bash
 
     slurm-jupyter.py -m 4g
 
 
-As a guide to how much memmory you are using, `slurm-jupyter` will show a gaugue with regularly updated with current and max memory usage:
+As a guide to how much memmory you are using, ``slurm-jupyter`` will show a gaugue with regularly updated with current and max memory usage:
 
 
