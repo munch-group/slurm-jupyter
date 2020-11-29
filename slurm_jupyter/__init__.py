@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#from __future__ import (absolute_import, division, print_function, unicode_literals) # TODO: Remove this?
+
 import subprocess
 import sys
 import os
@@ -129,20 +129,19 @@ def submit_slurm_server_job(spec, verbose=False):
         str: Slurm job id.
     """
 
-    cmd = 'ssh {user}@{frontend} cat - > {tmp_dir}/{tmp_script} ; mkdir -p {tmp_dir} ; {slurm} ; sbatch {tmp_dir}/{tmp_script} '.format(**spec)
+    cmd = 'ssh {user}@{frontend} cat - > {tmp_dir}/{tmp_script} ; mkdir -p {tmp_dir} ; sbatch {tmp_dir}/{tmp_script} '.format(**spec)
         
     if verbose: print("script ssh transfer:", cmd, sep='\n')
 
     script = slurm_server_script.format(**spec)
     if verbose: print("slurm script:", script, sep='\n')
 
-    if sys.version_info >= (3,0): script = script.encode()
+    script = script.encode()
     stdout, stderr = execute(cmd, stdin=script) # hangs untill submission
 
     # get stdour and stderr and get jobid
-    if sys.version_info >= (3,0):
-        stdout = stdout.decode()
-        stderr = stderr.decode()
+    stdout = stdout.decode()
+    stderr = stderr.decode()
     try:
         job_id = re.search('Submitted batch job (\d+)', stdout).group(1)
     except AttributeError:
@@ -173,15 +172,14 @@ def submit_slurm_batch_job(spec, verbose=False):
     with open(tmp_script_path, 'w') as f:
         f.write(script)
 
-    cmd = '{slurm} && sbatch {tmp_dir}/{tmp_script} '.format(**spec)
+    cmd = 'sbatch {tmp_dir}/{tmp_script} '.format(**spec)
     if verbose: print("command:", cmd, sep='\n')
    
     stdout, stderr = execute(cmd, shell=True) # hangs untill submission
 
     # get stdour and stderr and get jobid
-    if sys.version_info >= (3,0):
-        stdout = stdout.decode()
-        stderr = stderr.decode()
+    stdout = stdout.decode()
+    stderr = stderr.decode()
     try:
         job_id = re.search('Submitted batch job (\d+)', stdout).group(1)
     except AttributeError:
@@ -207,16 +205,15 @@ def wait_for_job_allocation(spec, verbose=False):
     # wait a bit to make sure jobinfo database is updated
     time.sleep(20)
 
-    cmd = 'ssh {user}@{frontend} {slurm} ; squeue --noheader --format %N -j {job_id}'.format(**spec)        
+    cmd = 'ssh {user}@{frontend} squeue --noheader --format %N -j {job_id}'.format(**spec)        
     stdout, stderr = execute(cmd)
-    if sys.version_info >= (3,0): stdout = stdout.decode()
+    stdout = stdout.decode()
     node_id = stdout.strip()
 
     while not node_id: #not m or m.group(1) == 'None':
         time.sleep(10)
         stdout, stderr = execute(cmd)
-        if sys.version_info >= (3,0):
-            stdout = stdout.decode()
+        stdout = stdout.decode()
         # m = regex.search(stdout)
         node_id = stdout.strip()
     if verbose: print(stdout)
@@ -356,7 +353,7 @@ def transfer_memory_script(spec, verbose=False):
         
     if verbose: print("memory script:", script, sep='\n')
 
-    if sys.version_info >= (3,0): script = script.encode()
+    script = script.encode()
     stdout, stderr = execute(cmd, stdin=script) # hangs untill submission
 
 
@@ -493,7 +490,6 @@ def slurm_jupyter():
             'total_memory': args.total_memory,
             'cwd': os.getcwd(),
             'sources_loaded': '',
-            'slurm': 'source /com/extra/slurm/14.03.0/load.sh', # TODO: is this requierd???
             'mem_script': 'mem_jupyter.py',
             'tmp_script': 'slurm_jupyter_{}.sh'.format(int(time.time())),
             'tmp_name': 'slurm_jupyter',
@@ -656,7 +652,7 @@ def slurm_jupyter():
             pass
 
         print(BLUE+'\nCanceling slurm job running jupyter server'+ENDC)
-        stdout, stderr = execute('ssh {user}@{frontend} {slurm} ; scancel {job_id}'.format(**spec))
+        stdout, stderr = execute('ssh {user}@{frontend} scancel {job_id}'.format(**spec))
         sys.exit()
 
 
