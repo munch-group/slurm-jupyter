@@ -330,7 +330,7 @@ def open_chrome(spec):
     Args:
         spec (dict): Parameter specification.
     """
-    if platform.platform().startswith('Darwin'):
+    if platform.platform().startswith('Darwin') or platform.platform().startswith('macOS-'):
         chrome_path = 'open -a /Applications/Google\ Chrome.app %s'
     else:
         chrome_path = '/usr/bin/google-chrome %s'
