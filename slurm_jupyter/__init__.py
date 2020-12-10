@@ -17,6 +17,7 @@ from distutils.version import LooseVersion
 
 from subprocess import PIPE, Popen
 from threading  import Thread, Event, Timer
+import webbrowser
 
 from colorama import init
 init()
@@ -324,19 +325,27 @@ def open_port(spec, verbose=False):
     return port_p, port_t, port_q
 
 
-def open_chrome(spec):
-    """Opens Chrome on localhost and port.
+def open_browser(spec):
+    """Opens default browser on localhost and port.
 
     Args:
         spec (dict): Parameter specification.
     """
+    url = 'https://localhost:{port}'.format(**spec)
     if platform.platform().startswith('Darwin') or platform.platform().startswith('macOS-'):
         chrome_path = 'open -a /Applications/Google\ Chrome.app %s'
+        if os.path.exists('/Applications/Google Chrome.app'):
+            webbrowser.get(chrome_path).open(url, new=2)
+        else:
+            webbrowser.open(url, new=2)
+    elif platform.platform().startswith('Windows'):
+        webbrowser.open(url, new=2)
     else:
         chrome_path = '/usr/bin/google-chrome %s'
-    url = 'https://localhost:{port}'.format(**spec)
-    print(url)
-    webbrowser.get(chrome_path).open(url)
+        if os.path.exists('/usr/bin/google-chrome'):
+            webbrowser.get(chrome_path).open(url, new=2)
+        else:
+            webbrowser.open(url, new=2)
 
 
 def transfer_memory_script(spec, verbose=False):
@@ -612,12 +621,12 @@ def slurm_jupyter():
                     if re.search('Jupyter Notebook[\d. ]+is running', line):
                         port_p, port_t, port_q = open_port(spec, verbose=args.verbose)
 
-                        open_chrome(spec)
-                        print(BLUE+'If your browser says "Your connection is not private",',
-                        'click "Advanced" and then "Proceed etc. (unsafe)"\n',
-                        '(To skip this step in the future you can type this in the Chrome addres bar:\n',
-                        '"chrome://flags/#allow-insecure-localhost"',
-                        'and then select "Enable")'+ENDC)
+                        open_browser(spec)
+                        print(BLUE+' Your browser may complain that the connection is not private.\n',
+                                   'In Safari, you can proceed to allow this. In Chrome you need"\n',
+                                   'to visit "chrome://flags/#allow-insecure-localhost" and select\n',
+                                   '"Enable". Once ready, jupyter may ask for your cluster password.'+ENDC)
+
     except KeyboardInterrupt:
 
         # not possible to do Keyboard interrupt from hereon out
