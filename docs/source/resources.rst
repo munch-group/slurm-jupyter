@@ -12,7 +12,7 @@ The default is a single core, but you can specify how many cores you want availa
 
 .. code-block:: bash
 
-    slurm-jupyter.py -c 3
+    slurm-jupyter -c 3
 
 
 Running time
@@ -28,7 +28,7 @@ The time format is like this: ``days-hours:minutes:seconds`` like for slurm, but
 
 .. code-block:: bash
 
-    slurm-jupyter.py -t 5h
+    slurm-jupyter -t 5h
 
 
 Memory
@@ -40,7 +40,7 @@ To specify that you want 4g of memory available on the slurn node you use the ``
 
 .. code-block:: bash
 
-    slurm-jupyter.py -m 4g
+    slurm-jupyter -m 4g
 
 
 As a guide to how much memmory you are using, ``slurm-jupyter`` will show a gaugue with regularly updated with current and max memory usage:
