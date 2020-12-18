@@ -17,6 +17,10 @@ def seconds2string(sec):
     return f'{days}-{hours:02}:{minutes:02}:{seconds:02}'
 
 
+def human2walltime(d=0, h=0, m=0, s=0):
+    return seconds2string(d * 86400 + h * 3600 + m * 60 + s)
+
+
 def execute(cmd, stdin=None, shell=False):
     """Executes a system command line.
 

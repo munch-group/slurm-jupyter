@@ -28,7 +28,7 @@ except ImportError:
     from queue import Queue, Empty  # python 3.x
 
 from .templates import slurm_server_script, slurm_batch_script, mem_script
-from .utils import execute, modpath, on_windows, str_to_mb, seconds2string
+from .utils import execute, modpath, on_windows, str_to_mb, seconds2string, human2walltime
 
 # global run event to communicate with threads
 RUN_EVENT = None
@@ -486,6 +486,11 @@ def slurm_jupyter():
         print("Multiprocessign across multiple nodes not supported yet - sorry")
         sys.exit()
 
+    if args.time[-1] in 'smhdSMHD':
+        unit = args.time[-1].lower()
+        value = int(args.time[:-1])
+        args.time = human2walltime(**{unit:value})
+
     spec = {'user': args.user,
             'port': args.port,
             'environment': args.environment,
@@ -746,6 +751,11 @@ def slurm_nb_run():
 
     home = os.path.expanduser("~")
 
+    if args.time[-1] in 'smhdSMHD':
+        unit = args.time[-1].lower()
+        value = int(args.time[:-1])
+        args.time = human2walltime(**{unit:value})
+        
     spec = {'environment': args.environment,
             'walltime': args.time,
             'account': args.account,

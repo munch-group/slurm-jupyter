@@ -24,7 +24,9 @@ The default time available on is 5 hours. If you want your to be allowed to run 
 
     slurm-jupyter.py -t 11:00:00
 
-The time format is like this: ``days-hours:minutes:seconds``.
+The time format is like this: ``days-hours:minutes:seconds`` like for slurm, but you can also specify seconds, minutes, or hours as a number followed by a ``s``, ``m``, or ``h``: 
+
+    slurm-jupyter.py -t 5h
 
 
 Memory
