@@ -70,11 +70,11 @@ def check_for_conda_update():
     """Checks for a more recent conda version and prints a message.
     """
     cmd = 'conda search -c kaspermunch slurm-jupyter'
-    conda_search = subprocess.check_output(cmd.split()).decode()
-    newest_version = conda_search.strip().split('\n')[-1].split()[1]
+    conda_search = subprocess.check_output(cmd, shell=True).decode()
+    newest_version = conda_search.strip().splitlines()[-1].split()[1]
     cmd = 'conda list -f slurm-jupyter'
-    conda_search = subprocess.check_output(cmd.split()).decode()
-    this_version = conda_search.strip().split('\n')[-1].split()[1]
+    conda_search = subprocess.check_output(cmd, shell=True).decode()
+    this_version = conda_search.strip().splitlines()[-1].split()[1]
     if LooseVersion(newest_version) > LooseVersion(this_version):
         msg = '\nA newer version of slurm-jupyter exists ({}). To update run:\n'.format(newest_version)
         msg += '\n\tconda update -c kaspermunch slurm-jupyter\n'
