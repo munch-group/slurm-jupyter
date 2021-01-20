@@ -623,7 +623,7 @@ def slurm_jupyter():
                     if 'SSLV3_ALERT_CERTIFICATE_UNKNOWN' not in line: # skip warnings about SSL certificate
                         print(line, end="")
 
-                    if re.search('Jupyter Notebook[\d. ]+is running', line):
+                    if re.search('Jupyter Notebook[\d. ]+is running', line) or re.search('Jupyter Server[\d. ]+is running', line):
                         port_p, port_t, port_q = open_port(spec, verbose=args.verbose)
 
                         open_browser(spec)
