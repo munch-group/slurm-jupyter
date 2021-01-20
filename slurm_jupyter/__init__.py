@@ -246,7 +246,8 @@ def open_output_connection(cmd, spec):
     Returns:
         (subprocess.Popen, threading.Thread, Queue.Queue): Process, Thread and Queue.
     """      
-    p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=ON_POSIX)
+    # p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=ON_POSIX)
+    p = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=ON_POSIX)
     q = Queue()
     t = Thread(target=enqueue_output, args=(p.stdout, q))
     t.daemon = True # thread dies with the program
