@@ -265,7 +265,18 @@ def open_jupyter_stdout_connection(spec, verbose=False):
 
     Returns:
         (subprocess.Popen, threading.Thread, Queue.Queue): Process, Thread and Queue.
-    """       
+    """
+
+    file_created = False
+    cmd = 'ssh -q {user}@{frontend} [[ -f {tmp_dir}/{tmp_name}.{job_id}.out ]] && echo "File exists"'.format(**spec)
+    while not file_created:
+        if verbose: print("testing existence:", cmd)
+        stdout, stderr = execute(cmd)
+        if "File exists" in stdout.decode():
+            file_created = True
+        else:
+            time.sleep(10)
+
     cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.out'.format(**spec)
     if verbose: print("jupyter stdout connection:", cmd)
     return open_output_connection(cmd, spec)
@@ -281,7 +292,18 @@ def open_jupyter_stderr_connection(spec, verbose=False):
 
     Returns:
         (subprocess.Popen, threading.Thread, Queue.Queue): Process, Thread and Queue.
-    """      
+    """
+
+    file_created = False
+    cmd = 'ssh -q {user}@{frontend} [[ -f {tmp_dir}/{tmp_name}.{job_id}.err ]] && echo "File exists"'.format(**spec)
+    while not file_created:
+        if verbose: print("testing existence:", cmd)
+        stdout, stderr = execute(cmd)
+        if "File exists" in stdout.decode():
+            file_created = True
+        else:
+            time.sleep(10)
+
     cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err'.format(**spec)
     if verbose: print("jupyter stderr connection:", cmd)
     return open_output_connection(cmd, spec)
