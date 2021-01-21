@@ -651,9 +651,9 @@ def slurm_jupyter():
 
                         open_browser(spec)
                         print(BLUE+' Your browser may complain that the connection is not private.\n',
-                                   'In Safari, you can proceed to allow this. In Chrome you need"\n',
-                                   'to visit "chrome://flags/#allow-insecure-localhost" and select\n',
-                                   '"Enable". Once ready, jupyter may ask for your cluster password.'+ENDC)
+                                   'In Safari, you can proceed to allow this. In Chrome, you need"\n',
+                                   'to simply type the characters "thisisunsafe" while in the Chrome window.\n',
+                                   'Once ready, jupyter may ask for your cluster password.'+ENDC)
 
     except KeyboardInterrupt:
 
