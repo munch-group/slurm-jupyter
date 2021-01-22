@@ -362,7 +362,11 @@ def open_browser(spec):
         else:
             webbrowser.open(url, new=2)
     elif platform.platform().startswith('Windows'):
-        webbrowser.open(url, new=2)
+        chrome_path = 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe %s'
+        if os.path.exists(os.path.abspath(os.path.join(os.sep, 'Program Files (x86)', 'Google', 'Chrome', 'Application', 'chrome.exe'))):
+            webbrowser.get(chrome_path).open(url, new=2)
+        else:
+            webbrowser.open(url, new=2)
     else:
         chrome_path = '/usr/bin/google-chrome %s'
         if os.path.exists('/usr/bin/google-chrome'):
