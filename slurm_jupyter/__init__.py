@@ -892,6 +892,8 @@ def slurm_nb_run():
 
                 suffix = modpath(spike_file, suffix='', parent='')
 
+                # TODO: make this work as transaction: write notebooks to a tmp dir and only write to target dir if successfull 
+
                 new_notebook_path = modpath(notebook_path, base=notebook_base_name + '_' + suffix, parent=out_dir)
                 with open(new_notebook_path, 'w') as f:
                     nbformat.write(nb, f)

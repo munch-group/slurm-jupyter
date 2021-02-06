@@ -22,13 +22,19 @@ Running `slurm-jupyter`
 -------------------------
 
 If your username on your local machine is the same as on the cluster,
-``slurm-jupyter`` will run like this:
+you can run `slurm-jupyter` like this:
 
 .. code-block:: bash
 
     slurm-jupyter -e monkey -A baboon
 
-where ``-e`` option specifies some conda environment on the cluster that you
+`slurm-jupyter` runs jupyterlab by default. If you want the classical notebook use this command:
+
+.. code-block:: bash
+
+    slurm-jupyter -e monkey -A baboon --run notebook
+
+The ``-e`` option specifies some conda environment on the cluster that you
 want jupyter to run in. Your notbooks run on the cluster, so that environment
 needs should have jupyter/jupyterlab installed and any packages needed to run
 your notebooks. Use the `-A` options to specify the project you want to bill
@@ -45,13 +51,8 @@ connection is unsafe. In Safari you proceed to allow this. In Chrome, you can
 simply type the characters "thisisunsafe" while in the Chrome window:
 
 Once ready, jupyter may ask for your password. To close the jupyter
-notebook, press Ctrl-c in the terminal. Closing the browser window does not
-close down the jupyter on the cluster. You can read this tutorial to learn how
-to use a jupyter notebook.
-
-.. code-block:: bash
-
-    slurm-jupyter -u hamlet -e monkey
+notebook, press `Ctrl-c` in the terminal. Closing the browser window does not
+close down the jupyter on the cluster.
 
 The script ``slurm-jupyter`` has a lot of options with sensible default values that you can see like this:
 

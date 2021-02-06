@@ -15,7 +15,7 @@ machine. Make the default installation.
 If you have a Windows machine, you must use the *Anaconda Poweshell Prompt* as
 your terminal (*not* the Anaconda Prompt and *not* the CMD). 
 
-Install `slurm-jupyter like this`:
+Install `slurm-jupyter` like this:
 
 .. code-block:: bash
 
@@ -24,7 +24,7 @@ Install `slurm-jupyter like this`:
 The operation of `slurm-jupyter` requires that you have set up ssk-keys on the
 cluster so that you can log in without using a password. First check if you have
 these two authentication files on your local machine (you can do so by running
-ls -a ~/.ssh in the terminal):
+`ls -a ~/.ssh` in the terminal):
 
 .. code-block:: bash
 
@@ -38,7 +38,7 @@ passphrase when prompted - just press enter:
 
     ssh-keygen -t rsa
 
-Now use ssh to create a directory ``~/.ssh`` on the cluster (assuming your
+Now use ssh to create a directory `~/.ssh` on the cluster (assuming your
 username on the cluster is `donald`):
 
 .. code-block:: bash
