@@ -719,6 +719,7 @@ def slurm_nb_run():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
                                         description=description)
 
+    # TODO: make sure this only shares common  arguments
     add_slurm_arguments(parser)                  
 
     # nbconvert arguments
@@ -861,6 +862,9 @@ def slurm_nb_run():
             new_notebook_list = list()
 
             for notebook_path in notebook_list:
+
+                # TODO: instead add gwf targets with dependencies
+                # TODO: disallow --allow-errors when running more than one notebook
 
                 # find cell with %run magic if any
                 with open(notebook_path) as f:
