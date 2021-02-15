@@ -33,9 +33,9 @@ def execute(cmd, stdin=None, shell=False):
         tuple: Two strings holding standard output and standard error respectively.
     """
     if shell:
-        process = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, shell=True)
+        process = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, shell=True, check=True)
     else:
-        process = Popen(cmd.split(), stdin=PIPE, stdout=PIPE, stderr=PIPE)
+        process = Popen(cmd.split(), stdin=PIPE, stdout=PIPE, stderr=PIPE, check=True)
     stdout, stderr = process.communicate(stdin)
     return stdout, stderr
 

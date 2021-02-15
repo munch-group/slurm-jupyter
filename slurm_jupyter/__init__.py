@@ -108,10 +108,11 @@ def get_cluster_uid(spec):
     Returns:
         int: User id.
     """
-    process = subprocess.Popen(
+    process = Popen(
         'ssh {user}@{frontend} id'.format(**spec),
         shell=True,
         universal_newlines=True,
+        check=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
@@ -247,7 +248,7 @@ def open_output_connection(cmd, spec):
         (subprocess.Popen, threading.Thread, Queue.Queue): Process, Thread and Queue.
     """      
     # p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=ON_POSIX)
-    p = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=ON_POSIX)
+    p = Popen(cmd, shell=True, check=True, stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=ON_POSIX)
     q = Queue()
     t = Thread(target=enqueue_output, args=(p.stdout, q))
     t.daemon = True # thread dies with the program
@@ -337,7 +338,7 @@ def open_port(spec, verbose=False):
     """
     cmd = 'ssh -L{port}:{node}.genomedk.net:{hostport} {user}@{frontend}'.format(**spec)
     if verbose: print("forwarding port:", cmd)
-    port_p = Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+    port_p = Popen(cmd, shell=True, check=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
     # we have to set stdin=PIPE even though we eodn't use it because this
     # makes sure the process does not inherrit stdin from the parent process (this).
     # Otherwise signals are sent to the process and not to the python script
@@ -545,6 +546,7 @@ def slurm_jupyter():
     process = subprocess.Popen(
         'ssh -q {user}@{frontend} exit'.format(**spec),
         shell=True,
+        check=True,
         universal_newlines=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE)
