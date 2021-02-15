@@ -77,7 +77,7 @@ def check_for_conda_update():
     this_version = conda_search.strip().splitlines()[-1].split()[1]
     if LooseVersion(newest_version) > LooseVersion(this_version):
         msg = '\nA newer version of slurm-jupyter exists ({}). To update run:\n'.format(newest_version)
-        msg += '\n\tconda update -c kaspermunch "slurm-jupyter={}"\n'.format(newest_version)
+        msg += '\n\tconda update -c kaspermunch "slurm-jupyter"\n'
         print(RED + msg + ENDC)
 
 
@@ -342,6 +342,13 @@ def open_port(spec, verbose=False):
     # we have to set stdin=PIPE even though we eodn't use it because this
     # makes sure the process does not inherrit stdin from the parent process (this).
     # Otherwise signals are sent to the process and not to the python script
+
+    # TODO: Make some kind of check to make sure the port forwarding is working
+    # MAC:
+    # lsof -i -P | grep LISTEN 
+    # Linux:
+    # netstat -a | grep LISTEN
+
     port_q = Queue()
     port_t = Thread(target=enqueue_output, args=(port_p.stderr, port_q))
     port_t.daemon = True # thread dies with the program
