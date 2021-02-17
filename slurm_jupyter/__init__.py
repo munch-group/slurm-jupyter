@@ -749,10 +749,10 @@ def slurm_nb_run():
                     dest="inplace",
                     action='store_true',
                     help="Output format.")
-    parser.add_argument("--cleanup",
-                    dest="cleanup",
-                    action='store_true',
-                    help="Removes un-executed notebooks generated using --spike and format other than 'notebook'")                           
+    # parser.add_argument("--cleanup",
+    #                 dest="cleanup",
+    #                 action='store_true',
+    #                 help="Removes un-executed notebooks generated using --spike and format other than 'notebook'")                           
 
     parser.add_argument("-s", "--spike",
                     dest="spike",
@@ -856,10 +856,79 @@ def slurm_nb_run():
 
     import nbformat
 
+
+    # TODO: submit jobs trough GWF Do the whole thing in a tmp dir and only cp
+    # back to the destination as last command so that we do not get notebooks
+    # that are not run
+
+    # make a template that runs one notebook
+
+    from gwf import Workflow, AnonymousTarget
+
+    gwf = Workflow(defaults={'account': args.account})
+
+    def run_workflow(workflow):
+        from gwf.core import Backend, Graph, Scheduler
+        from gwf.conf import config
+
+        graph = Graph.from_targets(workflow.targets)
+        backend_cls = Backend.from_name('slurm')
+
+        with backend_cls() as backend:
+            scheduler = Scheduler(graph=graph, backend=backend, dry_run=False)
+            scheduler.schedule_many(list(graph))
+
+    def nbconvert(notebook_file_name, dependencies=[], inplace=False, 
+                  output_format='notebook', allow_errors=False, timeout=-1):
+        inputs = dependencies
+        outputs = [notebook_file_name]
+        options = {
+            'cores': args.cores,
+            'memory': args.total_memory,
+        }
+
+        if allow_errors:
+            allow_errors = '--allow-errors'
+        else:
+            allow_errors = ''
+
+        if inplace:
+            inplace = '--inplace'
+        else:
+            inplace = ''
+
+        spec = f'''
+        cp {notebook_file_name} $TMPDIR/`basename {notebook_file_name}` && \
+        nbconvert_cmd = "jupyter nbconvert --ClearOutputPreprocessor.enabled=True \
+            --ExecutePreprocessor.timeout={timeout} {allow_errors} {inplace and '--allow-errors' or ''} \
+                --to {output_format} --execute {notebook_file_name}" && \
+        cp $TMPDIR/`basename {notebook_file_name}` {notebook_file_name}
+        '''
+
+        return AnonymousTarget(inputs=inputs, outputs=outputs, options=options, spec=spec)
+
+
+
+
     if not args.spike:
-        command_list = [nbconvert_cmd.format(notebook=notebook, **spec) for notebook in notebook_list]
-        spec['commands'] = ' && '.join(command_list)
-        submit_slurm_batch_job(spec, verbose=args.verbose)
+        dependencies = []
+        for notebook in notebook_list:
+            gwf.target_from_template(
+                name=modpath(notebook, parent=''),
+                template=nbconvert(
+                    notebook_file_name=notebook,
+                    dependencies=dependencies,
+                    inplace=True,
+                    allow_errors=False, 
+                    timeout=args.timeout,
+                    output_format=args.format
+                )
+            )
+            dependencies.append(notebook)
+
+        # command_list = [nbconvert_cmd.format(notebook=notebook, **spec) for notebook in notebook_list]
+        # spec['commands'] = ' && '.join(command_list)
+        # submit_slurm_batch_job(spec, verbose=args.verbose)
 
     else:
         for spike_file in args.spike:
@@ -904,19 +973,37 @@ def slurm_nb_run():
 
                 suffix = modpath(spike_file, suffix='', parent='')
 
-                # TODO: make this work as transaction: write notebooks to a tmp dir and only write to target dir if successfull 
-
                 new_notebook_path = modpath(notebook_path, base=notebook_base_name + '_' + suffix, parent=out_dir)
                 with open(new_notebook_path, 'w') as f:
                     nbformat.write(nb, f)
 
                 new_notebook_list.append(new_notebook_path)
 
-            if args.format != 'notebook' and args.cleanup:
-                param_nbconvert_cmd = nbconvert_cmd + ' && rm -f {notebook}'
-            else:
-                param_nbconvert_cmd = nbconvert_cmd
+            ###################################
+            dependencies = [spike_file]
+            for notebook in notebook_list:
+                gwf.target_from_template(
+                    name=modpath(notebook, parent=''),
+                    template=nbconvert(
+                        notebook_file_name=notebook,
+                        dependencies=dependencies,
+                        inplace=True,
+                        allow_errors=False, 
+                        timeout=args.timeout,
+                        output_format=args.format
+                    )
+                )
+                dependencies.append(notebook)
 
-            command_list = [param_nbconvert_cmd.format(notebook=notebook, **spec) for notebook in new_notebook_list]
-            spec['commands'] = ' && '.join(command_list)
-            submit_slurm_batch_job(spec, verbose=args.verbose)
+            ###################################
+
+            # if args.format != 'notebook' and args.cleanup:
+            #     param_nbconvert_cmd = nbconvert_cmd + ' && rm -f {notebook}'
+            # else:
+            #     param_nbconvert_cmd = nbconvert_cmd
+
+            # command_list = [param_nbconvert_cmd.format(notebook=notebook, **spec) for notebook in new_notebook_list]
+            # spec['commands'] = ' && '.join(command_list)
+            # submit_slurm_batch_job(spec, verbose=args.verbose)
+
+    run_workflow(gwf)
