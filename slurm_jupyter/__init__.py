@@ -365,10 +365,7 @@ def open_browser(spec):
     url = 'https://localhost:{port}'.format(**spec)
     if platform.platform().startswith('Darwin') or platform.platform().startswith('macOS-'):
         chrome_path = 'open -a /Applications/Google\ Chrome.app %s'
-        if os.path.exists('/Applications/Google Chrome.app'):
-            webbrowser.get(chrome_path).open(url, new=2)
-        else:
-            webbrowser.open(url, new=2)
+        webbrowser.open(url, new=2)
     elif platform.platform().startswith('Windows'):
         chrome_path = 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe %s'
         if os.path.exists(os.path.abspath(os.path.join(os.sep, 'Program Files (x86)', 'Google', 'Chrome', 'Application', 'chrome.exe'))):

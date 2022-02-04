@@ -12,7 +12,7 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 
 setuptools.setup(
     name="slurm-jupyter",
-    version="2.0.22", # remember to also change version in docs/source/conf.py
+    version="2.0.23", # remember to also change version in docs/source/conf.py
     author="Kasper Munch",
     author_email="kaspermunch@birc.au.dk",
     description="Utilities for jupyter on a slurm cluster.",
