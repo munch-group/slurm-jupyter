@@ -22,7 +22,7 @@ copyright = '2020, Kasper Munch'
 author = 'Kasper Munch'
 
 # The full version, including alpha/beta/rc tags
-release = '2.0.24'
+release = '2.0.25'
 
 
 # -- General configuration ---------------------------------------------------
