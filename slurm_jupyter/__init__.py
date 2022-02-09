@@ -356,7 +356,7 @@ def open_port(spec, verbose=False):
     return port_p, port_t, port_q
 
 
-def open_browser(spec):
+def open_browser(spec, force_chrome=False):
     """Opens default browser on localhost and port.
 
     Args:
@@ -365,16 +365,19 @@ def open_browser(spec):
     url = 'https://localhost:{port}'.format(**spec)
     if platform.platform().startswith('Darwin') or platform.platform().startswith('macOS-'):
         chrome_path = 'open -a /Applications/Google\ Chrome.app %s'
-        webbrowser.open(url, new=2)
+        if force_chrome and os.path.exists('/Applications/Google Chrome.app'):
+             webbrowser.get(chrome_path).open(url, new=2)
+         else:
+             webbrowser.open(url, new=2)
     elif platform.platform().startswith('Windows'):
         chrome_path = 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe %s'
-        if os.path.exists(os.path.abspath(os.path.join(os.sep, 'Program Files (x86)', 'Google', 'Chrome', 'Application', 'chrome.exe'))):
+        if force_chrome and os.path.exists(os.path.abspath(os.path.join(os.sep, 'Program Files (x86)', 'Google', 'Chrome', 'Application', 'chrome.exe'))):
             webbrowser.get(chrome_path).open(url, new=2)
         else:
             webbrowser.open(url, new=2)
     else:
         chrome_path = '/usr/bin/google-chrome %s'
-        if os.path.exists('/usr/bin/google-chrome'):
+        if force_chrome and os.path.exists('/usr/bin/google-chrome'):
             webbrowser.get(chrome_path).open(url, new=2)
         else:
             webbrowser.open(url, new=2)
@@ -507,6 +510,10 @@ def slurm_jupyter():
                     default=0.1,
                     type=float,
                     help="Time out in seconds for cross thread operations")
+    parser.add_argument("-C", "--chrome",
+                    dest="chrome",
+                    action='store_true',
+                    help="View in Chrome if available (ignoring default browser)")                    
     parser.add_argument("-v", "--verbose",
                     dest="verbose",
                     action='store_true',
@@ -658,7 +665,7 @@ def slurm_jupyter():
                     if re.search('Jupyter Notebook[\d. ]+is running', line) or re.search('Jupyter Server[\d. ]+is running', line):
                         port_p, port_t, port_q = open_port(spec, verbose=args.verbose)
 
-                        open_browser(spec)
+                        open_browser(spec, force_chrome=args.chrome)
                         print(BLUE+' Your browser may complain that the connection is not private.\n',
                                    'In Safari, you can proceed to allow this. In Chrome, you need"\n',
                                    'to simply type the characters "thisisunsafe" while in the Chrome window.\n',
