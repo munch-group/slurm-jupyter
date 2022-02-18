@@ -652,6 +652,11 @@ def slurm_jupyter():
                     color = secs_left > 600 and BLUE or RED
                     mem_line += '\t'+color+'Time: '+seconds2string(secs_left)+ENDC
                     print(mem_line)
+
+                    # if secs_left <= 5*60:
+                    #     stdout, stderr = execute('ssh {user}@{frontend} pkill -9 -f "tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}"'.format(**spec))
+
+
             while True:
                 try:  
                     line = stderr_q.get(timeout=args.timeout)#get_nowait()
