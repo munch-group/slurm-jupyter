@@ -21,7 +21,7 @@ def human2walltime(d=0, h=0, m=0, s=0):
     return seconds2string(d * 86400 + h * 3600 + m * 60 + s)
 
 
-def execute(cmd, stdin=None, shell=False):
+def execute(cmd, stdin=None, shell=False, check_failure=True):
     """Executes a system command line.
 
     Args:
@@ -37,7 +37,8 @@ def execute(cmd, stdin=None, shell=False):
     else:
         process = Popen(cmd.split(), stdin=PIPE, stdout=PIPE, stderr=PIPE)
     stdout, stderr = process.communicate(stdin)
-    assert not process.returncode
+    if check_failure:
+        assert not process.returncode
     return stdout, stderr
 
 

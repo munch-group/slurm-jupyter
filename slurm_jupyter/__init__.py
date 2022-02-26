@@ -711,7 +711,7 @@ def slurm_jupyter():
             pass
 
         print(BLUE+'\nCanceling slurm job running jupyter server'+ENDC)
-        stdout, stderr = execute('ssh {user}@{frontend} scancel {job_id}'.format(**spec))
+        stdout, stderr = execute('ssh {user}@{frontend} scancel {job_id}'.format(**spec), check_failure=False)
         sys.exit()
 
 
