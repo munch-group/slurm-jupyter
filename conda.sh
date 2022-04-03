@@ -18,8 +18,8 @@ name=${PWD##*/}
 conda skeleton pypi --output-dir conda $name
 
 # for for each version of python
-for pythonversion in 3.6 3.7 3.8; do
-    conda-build --python $pythonversion conda/$name
+for pythonversion in 3.6 3.7 3.8 3.9 3.10 ; do
+    conda-build --python $pythonversion $@ conda/$name
 done
 
 # upload osx versions and convert to other architectures (assuming python only)
