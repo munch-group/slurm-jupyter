@@ -68,7 +68,7 @@ fi
 {environment}
 {ipcluster}
 unset XDG_RUNTIME_DIR
-jupyter {run} --ip=0.0.0.0 --no-browser --port={hostport} --NotebookApp.iopub_data_rate_limit=10000000000
+jupyter {run} --ip=0.0.0.0 --no-browser --port={hostport} --ServerApp.iopub_data_rate_limit=10000000000
 """
 
 # python script for monitoring memory usage

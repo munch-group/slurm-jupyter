@@ -10,10 +10,10 @@ fi
 hashed_pass=`python -c "from __future__ import print_function; from notebook.auth import passwd; res = passwd(); print(res)"`
 
 cat <<EOF > jupyter_notebook_config.py
-c.NotebookApp.certfile = '/home/$USER/.jupyter/mycert.pem'
-c.NotebookApp.keyfile = '/home/$USER/.jupyter/mykey.key'
-c.NotebookApp.open_browser = False
-c.NotebookApp.ip = '*'
-c.NotebookApp.port = $UID
-c.NotebookApp.password = '$hashed_pass'
+c.ServerApp.certfile = '/home/$USER/.jupyter/mycert.pem'
+c.ServerApp.keyfile = '/home/$USER/.jupyter/mykey.key'
+c.ServerApp.open_browser = False
+c.ServerApp.ip = '*'
+c.ServerApp.port = $UID
+c.ServerApp.password = '$hashed_pass'
 EOF
