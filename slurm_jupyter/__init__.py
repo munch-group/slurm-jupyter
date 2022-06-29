@@ -14,6 +14,7 @@ import argparse
 import signal
 from textwrap import wrap
 from distutils.version import LooseVersion
+from packaging import version
 
 from subprocess import PIPE, Popen
 from threading  import Thread, Event, Timer
@@ -383,6 +384,26 @@ def open_browser(spec, force_chrome=False):
         else:
             webbrowser.open(url, new=2)
 
+# TODO: make a check of jupyter lab version and give a user warning or abort if it is not 3
+def check_jupyterlab_version(spec):
+    """Check that jupyter lab version is >=3
+
+    Args:
+        spec (dict): Parameter specification.
+
+    Returns:
+        bool: whether version is 3
+    """
+    process = Popen(
+        'ssh {user}@{frontend} "conda activate simons_jupyter && conda list | grep grep \"jupyterlab \""'.format(**spec),
+        shell=True,
+        universal_newlines=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE)
+    stdout, stderr = process.communicate()
+    assert not process.returncode
+    name, version, package = stdout.split()
+    return version.parse(version) >= version.parse("3.0.0")
 
 def transfer_memory_script(spec, verbose=False):
     """Transvers the a python script to the cluster, which monitors memory use on the node.
@@ -679,10 +700,12 @@ def slurm_jupyter():
 
     except KeyboardInterrupt:
 
-        # not possible to do Keyboard interrupt from hereon out
+        # not possible to do Keyboard interrupt from here on out
         signal.signal(signal.SIGINT, kbintr_repressor)
 
-        # in try statements becuase these vars may not be defined at keyboard interrupt:
+        # TODO: Double Ctrl-C bypasses canceling of slurm job
+
+        # in try statements because these variabless may not be defined at keyboard interrupt:
         try:
             RUN_EVENT.clear()
             port_t.join()
