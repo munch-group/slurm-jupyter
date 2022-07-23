@@ -573,7 +573,7 @@ def slurm_jupyter():
             'frontend': args.frontend,
             'hostport': args.hostport,
             'job_name': args.name,
-            'job_id': None 
+            'job_id': None,
             'url': None}
 
 
