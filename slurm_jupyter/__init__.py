@@ -364,25 +364,26 @@ def open_browser(spec, force_chrome=False):
     Args:
         spec (dict): Parameter specification.
     """
-    url = 'https://localhost:{port}'.format(**spec)
+    if not spec['url']:
+        url = 'https://localhost:{port}'.format(**spec)
     if platform.platform().startswith('Darwin') or platform.platform().startswith('macOS-'):
         chrome_path = 'open -a /Applications/Google\ Chrome.app %s'
         if force_chrome and os.path.exists('/Applications/Google Chrome.app'):
             webbrowser.get(chrome_path).open(url, new=2)
         else:
-            webbrowser.open(url, new=2)
+            webbrowser.open(spec['url'], new=2)
     elif platform.platform().startswith('Windows'):
         chrome_path = 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe %s'
         if force_chrome and os.path.exists(os.path.abspath(os.path.join(os.sep, 'Program Files (x86)', 'Google', 'Chrome', 'Application', 'chrome.exe'))):
-            webbrowser.get(chrome_path).open(url, new=2)
+            webbrowser.get(chrome_path).open(spec['url'], new=2)
         else:
-            webbrowser.open(url, new=2)
+            webbrowser.open(spec['url'], new=2)
     else:
         chrome_path = '/usr/bin/google-chrome %s'
         if force_chrome and os.path.exists('/usr/bin/google-chrome'):
-            webbrowser.get(chrome_path).open(url, new=2)
+            webbrowser.get(chrome_path).open(spec['url'], new=2)
         else:
-            webbrowser.open(url, new=2)
+            webbrowser.open(spec['url'], new=2)
 
 # TODO: make a check of jupyter lab version and give a user warning or abort if it is not 3
 def check_jupyterlab_version(spec):
@@ -572,7 +573,8 @@ def slurm_jupyter():
             'frontend': args.frontend,
             'hostport': args.hostport,
             'job_name': args.name,
-            'job_id': None }
+            'job_id': None 
+            'url': None}
 
 
     # test ssh connection:
@@ -691,6 +693,10 @@ def slurm_jupyter():
 
                     if re.search('Jupyter Notebook[\d. ]+is running', line) or re.search('Jupyter Server[\d. ]+is running', line):
                         port_p, port_t, port_q = open_port(spec, verbose=args.verbose)
+
+                    m = re.search('http://127.0.0.1:\d+/lab\?token=\S+', line)
+                    if m:
+                        spec['url'] = m.group(0)
 
                         open_browser(spec, force_chrome=args.chrome)
                         print(BLUE+' Your browser may complain that the connection is not private.\n',
