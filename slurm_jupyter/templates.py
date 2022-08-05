@@ -4,6 +4,7 @@
 # shell script for running a batch job
 slurm_batch_script =  """#!/bin/sh
 #SBATCH -p {queue}
+{gres}
 {memory_spec}
 #SBATCH -n {nr_nodes}
 #SBATCH -c {nr_cores}
@@ -21,6 +22,7 @@ slurm_batch_script =  """#!/bin/sh
 # shell script for running the jupyter server
 slurm_server_script =  """#!/bin/sh
 #SBATCH -p {queue}
+{gres}
 {memory_spec}
 #SBATCH -n {nr_nodes}
 #SBATCH -c {nr_cores}
