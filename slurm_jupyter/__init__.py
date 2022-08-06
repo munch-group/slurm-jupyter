@@ -274,7 +274,7 @@ def open_jupyter_stdout_connection(spec, verbose=False):
     cmd = 'ssh -q {user}@{frontend} [[ -f {tmp_dir}/{tmp_name}.{job_id}.out ]] && echo "File exists"'.format(**spec)
     while not file_created:
         if verbose: print("testing existence:", cmd)
-        stdout, stderr = execute(cmd)
+        stdout, stderr = execute(cmd, check_failure=False)
         if "File exists" in stdout.decode():
             file_created = True
         else:
@@ -301,7 +301,7 @@ def open_jupyter_stderr_connection(spec, verbose=False):
     cmd = 'ssh -q {user}@{frontend} [[ -f {tmp_dir}/{tmp_name}.{job_id}.err ]] && echo "File exists"'.format(**spec)
     while not file_created:
         if verbose: print("testing existence:", cmd)
-        stdout, stderr = execute(cmd)
+        stdout, stderr = execute(cmd, check_failure=False)
         if "File exists" in stdout.decode():
             file_created = True
         else:
