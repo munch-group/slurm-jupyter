@@ -67,6 +67,9 @@ ON_POSIX = 'posix' in sys.builtin_module_names
 #             print(data, end="", file=sys.stderr)
 
 
+class TimeLimitApproaching(Exception):
+    pass
+
 def check_for_conda_update():
     """Checks for a more recent conda version and prints a message.
     """
@@ -78,7 +81,7 @@ def check_for_conda_update():
     this_version = conda_search.strip().splitlines()[-1].split()[1]
     if LooseVersion(newest_version) > LooseVersion(this_version):
         msg = '\nA newer version of slurm-jupyter exists ({}). To update run:\n'.format(newest_version)
-        msg += '\n\tconda install -c kaspermunch "slurm-jupyter"\n'
+        msg += '\n\tconda install -c kaspermunch -c conda-forge "slurm-jupyter"\n'
         print(RED + msg + ENDC)
 
 
@@ -280,7 +283,12 @@ def open_jupyter_stdout_connection(spec, verbose=False):
         else:
             time.sleep(10)
 
+
+    # cmd = 'ssh kmt@login.genome.au.dk "echo \\\"trap \\\'kill -HUP $(jobs -lp) 2>/dev/null || true\\\' exit; tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.out\\\" > {tmp_dir}/{tmp_name}.{job_id}.out.sh ; bash {tmp_dir}/{tmp_name}.{job_id}.out.sh"'.format(**spec)
+
     cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.out'.format(**spec)
+    # cmd = "ssh -t {user}@{frontend} '{{ tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.out }} | cat'".format(**spec)
+    # cmd = ''''ssh -t -t {user}@{frontend} "/bin/sh -O huponexit -c 'tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.out'"'''.format(**spec)
     if verbose: print("jupyter stdout connection:", cmd)
     return open_output_connection(cmd, spec)
 
@@ -307,7 +315,14 @@ def open_jupyter_stderr_connection(spec, verbose=False):
         else:
             time.sleep(10)
 
+    # cmd = "ssh {user}@{frontend} echo \"trap 'kill -HUP $(jobs -lp) 2>/dev/null || true' exit; tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err\" > {tmp_dir}/{tmp_name}.{job_id}.err.sh ; bash {tmp_dir}/{tmp_name}.{job_id}.err.sh".format(**spec)
+
+    # cmd = 'ssh kmt@login.genome.au.dk "echo \\\"trap \\\'kill -HUP $(jobs -lp) 2>/dev/null || true\\\' exit; tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err\\\" > {tmp_dir}/{tmp_name}.{job_id}.err.sh ; bash {tmp_dir}/{tmp_name}.{job_id}.err.sh"'.format(**spec)
+
     cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err'.format(**spec)
+    # cmd = "ssh -t {user}@{frontend} '{{ tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err }} | cat'".format(**spec)
+    # cmd = ''''ssh -t -t {user}@{frontend} "/bin/sh -O huponexit -c 'tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err'"'''.format(**spec)
+
     if verbose: print("jupyter stderr connection:", cmd)
     return open_output_connection(cmd, spec)
 
@@ -323,9 +338,15 @@ def open_memory_stdout_connection(spec, verbose=False):
     Returns:
         (subprocess.Popen, threading.Thread, Queue.Queue): Process, Thread and Queue.
     """     
+
+    # cmd = 'ssh kmt@login.genome.au.dk "echo \\\"trap \\\'kill -HUP $(jobs -lp) 2>/dev/null || true\\\' exit; ssh {user}@{node} python {tmp_dir}/mem_jupyter.py\\\" > {tmp_dir}/{tmp_name}.{job_id}.mem.sh ; bash {tmp_dir}/{tmp_name}.{job_id}.mem.sh"'.format(**spec)
     cmd = 'ssh {user}@{frontend} ssh {user}@{node} python {tmp_dir}/mem_jupyter.py'.format(**spec)
+    # cmd = 'ssh -t -t {user}@{frontend} ssh {user}@{node} python {tmp_dir}/mem_jupyter.py'.format(**spec)
+
     if verbose: print("memory stdout connection:", cmd)
     return open_output_connection(cmd, spec)
+
+#ssh -t -t -i id_rsa user@mic0 "/bin/sh -O huponexit -c 'sleep 100'"
 
 
 def open_port(spec, verbose=False):
@@ -658,8 +679,8 @@ def slurm_jupyter():
 
             # stop to cleanup before slurm cancels the job
             if end_time - int(time.time()) < 30:
-                print('\t'+RED+'Scheduled slurm job expires in 30 sec. Stopping server...'+ENDC)
-                raise KeyboardInterrupt
+                print('\n'+RED+'Scheduled slurm job expires in 30 sec. Stopping server.'+ENDC)
+                raise TimeLimitApproaching
 
             while True:
                 try:  
@@ -699,16 +720,53 @@ def slurm_jupyter():
 
                     if re.search('Jupyter Notebook[\d. ]+is running', line) or re.search('Jupyter Server[\d. ]+is running', line):
                         port_p, port_t, port_q = open_port(spec, verbose=args.verbose)
+                        token_url = None # server is runing, we now look for a token url
 
-                    m = re.search('http://127.0.0.1:\d+/lab\?token=\S+', line)
+                    # look for the token url
+                    m = re.search('https://127.0.0.1\S+', line)
                     if m:
-                        spec['url'] = m.group(0)
-
+                        token_url = m.group(0)
+                        spec['url'] = token_url
+                        print('URL', token_url)
                         open_browser(spec, force_chrome=args.chrome)
                         print(BLUE+' Your browser may complain that the connection is not private.\n',
                                    'In Safari, you can proceed to allow this. In Chrome, you need"\n',
                                    'to simply type the characters "thisisunsafe" while in the Chrome window.\n',
                                    'Once ready, jupyter may ask for your cluster password.'+ENDC)
+
+                    # in case we missed the token url
+                    m = re.search('Use Control-C to stop this server', line)
+                    if m and not token_url:
+                        print('URL here', token_url)
+                        open_browser(spec, force_chrome=args.chrome)
+                        print(BLUE+' Your browser may complain that the connection is not private.\n',
+                                   'In Safari, you can proceed to allow this. In Chrome, you need"\n',
+                                   'to simply type the characters "thisisunsafe" while in the Chrome window.\n',
+                                   'Once ready, jupyter may ask for your cluster password.'+ENDC)
+                                   
+    except TimeLimitApproaching:
+
+        # not possible to do Keyboard interrupt from here on out
+        signal.signal(signal.SIGINT, kbintr_repressor)
+
+        # TODO: Double Ctrl-C bypasses canceling of slurm job
+
+        RUN_EVENT.clear()
+        port_p.kill()
+        port_t.join()
+
+        stdout_p.kill() 
+        # stdout_t.join()
+
+        stderr_p.kill()
+        stderr_t.join()
+
+        mem_stdout_p.kill()
+        mem_stdout_t.join()
+
+        print(BLUE+'\nCanceling slurm job running jupyter server'+ENDC)
+        stdout, stderr = execute('ssh {user}@{frontend} scancel {job_id}'.format(**spec), check_failure=False)
+        sys.exit()
 
     except KeyboardInterrupt:
 
@@ -717,17 +775,17 @@ def slurm_jupyter():
 
         # TODO: Double Ctrl-C bypasses canceling of slurm job
 
-        # in try statements because these variabless may not be defined at keyboard interrupt:
+        # in try statements because these variables may not be defined at keyboard interrupt:
         try:
             RUN_EVENT.clear()
-            port_t.join()
             port_p.kill()
+            port_t.join()
         except:
             pass
 
         try:
+            stdout_p.kill() 
             stdout_t.join()
-            stdout_p.kill()
         except:
             pass
 
@@ -738,8 +796,8 @@ def slurm_jupyter():
             pass
             
         try:
-            mem_stdout_t.join()
             mem_stdout_p.kill()
+            mem_stdout_t.join()
             # mem_print_t.stop()
             # mem_print_t.join()
         except:
