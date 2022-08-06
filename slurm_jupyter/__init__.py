@@ -655,6 +655,12 @@ def slurm_jupyter():
         # mem_print_t.start()
 
         while True:
+
+            # stop to cleanup before slurm cancels the job
+            if end_time - int(time.time()) < 30:
+                print('\t'+RED+'Scheduled slurm job expires in 30 sec. Stopping server...'+ENDC)
+                raise KeyboardInterrupt
+
             while True:
                 try:  
                     line = stdout_q.get(timeout=args.timeout)#get_nowait()
