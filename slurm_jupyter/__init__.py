@@ -283,12 +283,8 @@ def open_jupyter_stdout_connection(spec, verbose=False):
         else:
             time.sleep(10)
 
+    cmd = 'ssh {user}@{frontend} tail --pid=$$ -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.out'.format(**spec)
 
-    # cmd = 'ssh kmt@login.genome.au.dk "echo \\\"trap \\\'kill -HUP $(jobs -lp) 2>/dev/null || true\\\' exit; tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.out\\\" > {tmp_dir}/{tmp_name}.{job_id}.out.sh ; bash {tmp_dir}/{tmp_name}.{job_id}.out.sh"'.format(**spec)
-
-    cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.out'.format(**spec)
-    # cmd = "ssh -t {user}@{frontend} '{{ tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.out }} | cat'".format(**spec)
-    # cmd = ''''ssh -t -t {user}@{frontend} "/bin/sh -O huponexit -c 'tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.out'"'''.format(**spec)
     if verbose: print("jupyter stdout connection:", cmd)
     return open_output_connection(cmd, spec)
 
@@ -315,13 +311,7 @@ def open_jupyter_stderr_connection(spec, verbose=False):
         else:
             time.sleep(10)
 
-    # cmd = "ssh {user}@{frontend} echo \"trap 'kill -HUP $(jobs -lp) 2>/dev/null || true' exit; tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err\" > {tmp_dir}/{tmp_name}.{job_id}.err.sh ; bash {tmp_dir}/{tmp_name}.{job_id}.err.sh".format(**spec)
-
-    # cmd = 'ssh kmt@login.genome.au.dk "echo \\\"trap \\\'kill -HUP $(jobs -lp) 2>/dev/null || true\\\' exit; tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err\\\" > {tmp_dir}/{tmp_name}.{job_id}.err.sh ; bash {tmp_dir}/{tmp_name}.{job_id}.err.sh"'.format(**spec)
-
-    cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err'.format(**spec)
-    # cmd = "ssh -t {user}@{frontend} '{{ tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err }} | cat'".format(**spec)
-    # cmd = ''''ssh -t -t {user}@{frontend} "/bin/sh -O huponexit -c 'tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err'"'''.format(**spec)
+    cmd = 'ssh {user}@{frontend} tail --pid=$$ -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err'.format(**spec)
 
     if verbose: print("jupyter stderr connection:", cmd)
     return open_output_connection(cmd, spec)
@@ -339,14 +329,20 @@ def open_memory_stdout_connection(spec, verbose=False):
         (subprocess.Popen, threading.Thread, Queue.Queue): Process, Thread and Queue.
     """     
 
-    # cmd = 'ssh kmt@login.genome.au.dk "echo \\\"trap \\\'kill -HUP $(jobs -lp) 2>/dev/null || true\\\' exit; ssh {user}@{node} python {tmp_dir}/mem_jupyter.py\\\" > {tmp_dir}/{tmp_name}.{job_id}.mem.sh ; bash {tmp_dir}/{tmp_name}.{job_id}.mem.sh"'.format(**spec)
-    cmd = 'ssh {user}@{frontend} ssh {user}@{node} python {tmp_dir}/mem_jupyter.py'.format(**spec)
+    # cmd = 'ssh {user}@{frontend} "echo \\\"trap \\\'kill -HUP $(jobs -lp) 2>/dev/null || true\\\' exit; ssh {user}@{node} python {tmp_dir}/mem_jupyter.py\\\" > {tmp_dir}/{tmp_name}.{job_id}.mem.sh"'.format(**spec)
+
+    # cmd = 'ssh {user}@{frontend} "echo \\\"trap \\\'kill -HUP -$$\\\' exit; ssh {user}@{node} python {tmp_dir}/mem_jupyter.py\\\" > {tmp_dir}/{tmp_name}.{job_id}.mem.sh"'.format(**spec)
+
+    # cmd = 'ssh {user}@{frontend} "echo \\\"trap \\\'kill -9 $(ps -s $$ -o pid=)\\\' exit; ssh {user}@{node} python {tmp_dir}/mem_jupyter.py\\\" > {tmp_dir}/{tmp_name}.{job_id}.mem.sh"'.format(**spec)
+    # cmd = 'ssh {user}@{frontend} "bash {tmp_dir}/{tmp_name}.{job_id}.mem.sh"'.format(**spec)
+
     # cmd = 'ssh -t -t {user}@{frontend} ssh {user}@{node} python {tmp_dir}/mem_jupyter.py'.format(**spec)
+
+    cmd = 'ssh {user}@{frontend} ssh {user}@{node} python {tmp_dir}/mem_jupyter.py'.format(**spec)
+
 
     if verbose: print("memory stdout connection:", cmd)
     return open_output_connection(cmd, spec)
-
-#ssh -t -t -i id_rsa user@mic0 "/bin/sh -O huponexit -c 'sleep 100'"
 
 
 def open_port(spec, verbose=False):
@@ -751,18 +747,34 @@ def slurm_jupyter():
 
         # TODO: Double Ctrl-C bypasses canceling of slurm job
 
-        RUN_EVENT.clear()
-        port_p.kill()
-        port_t.join()
+        try:
+            RUN_EVENT.clear()
+            time.sleep(1)
 
-        stdout_p.kill() 
-        # stdout_t.join()
+            port_p.kill()
+            port_t.join()
+        except:
+            pass
 
-        stderr_p.kill()
-        stderr_t.join()
+        try:
+            stdout_p.kill() 
+            stdout_t.join()
+        except:
+            pass
 
-        mem_stdout_p.kill()
-        mem_stdout_t.join()
+        try:
+            stderr_p.kill()
+            stderr_t.join()
+        except:
+            pass
+            
+        try:
+            mem_stdout_p.kill()
+            mem_stdout_t.join()
+            # mem_print_t.stop()
+            # mem_print_t.join()
+        except:
+            pass
 
         print(BLUE+'\nCanceling slurm job running jupyter server'+ENDC)
         stdout, stderr = execute('ssh {user}@{frontend} scancel {job_id}'.format(**spec), check_failure=False)
@@ -778,6 +790,8 @@ def slurm_jupyter():
         # in try statements because these variables may not be defined at keyboard interrupt:
         try:
             RUN_EVENT.clear()
+            time.sleep(1)
+
             port_p.kill()
             port_t.join()
         except:
