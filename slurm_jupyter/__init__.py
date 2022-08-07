@@ -283,7 +283,7 @@ def open_jupyter_stdout_connection(spec, verbose=False):
         else:
             time.sleep(10)
 
-    cmd = 'ssh {user}@{frontend} tail --pid=$$ -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.out'.format(**spec)
+    cmd = 'ssh {user}@{frontend} tail --pid=`ps -o ppid= $$` -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.out'.format(**spec)
 
     if verbose: print("jupyter stdout connection:", cmd)
     return open_output_connection(cmd, spec)
@@ -311,7 +311,9 @@ def open_jupyter_stderr_connection(spec, verbose=False):
         else:
             time.sleep(10)
 
-    cmd = 'ssh {user}@{frontend} tail --pid=$$ -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err'.format(**spec)
+    cmd = "ssh {user}@{frontend} 'tail --pid=`ps -o ppid= $$` -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err'".format(**spec)
+
+    # cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err'.format(**spec)
 
     if verbose: print("jupyter stderr connection:", cmd)
     return open_output_connection(cmd, spec)
