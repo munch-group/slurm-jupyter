@@ -612,6 +612,17 @@ def slurm_jupyter():
 
     if spec['port'] is None:
         spec['port'] = get_cluster_uid(spec)
+        if sys.platform == "darwin":
+            for i in range(10):
+                cmd = f"lsof -i -P | grep LISTEN | grep 'localhost:{spec['port']}'"
+                stdout, stderr = execute(cmd, shell=True, check_failure=False)
+                if not stdout.strip():
+                    # port not in use
+                    break
+                else:
+                    spec['port'] += 1
+            if i:
+                print(BLUE+f"Default port {spec['port']-i} in busy. Using port {spec['port']}"+ENDC)
 
     if spec['hostport'] is None:
         spec['hostport'] = get_cluster_uid(spec)
