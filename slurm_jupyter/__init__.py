@@ -81,7 +81,7 @@ def check_for_conda_update():
     this_version = conda_search.strip().splitlines()[-1].split()[1]
     if LooseVersion(newest_version) > LooseVersion(this_version):
         msg = '\nA newer version of slurm-jupyter exists ({}). To update run:\n'.format(newest_version)
-        msg += '\n\tconda install -c kaspermunch -c conda-forge "slurm-jupyter"\n'
+        msg += '\n\tconda install -c kaspermunch -c conda-forge slurm-jupyter={newest_version}\n'
         print(RED + msg + ENDC)
 
 
