@@ -365,11 +365,11 @@ def open_browser(spec, force_chrome=False):
         spec (dict): Parameter specification.
     """
     if not spec['url']:
-        spec['url'] = 'https://localhost:{port}'.format(**spec)
+        url = 'https://localhost:{port}'.format(**spec)
     if platform.platform().startswith('Darwin') or platform.platform().startswith('macOS-'):
         chrome_path = 'open -a /Applications/Google\ Chrome.app %s'
         if force_chrome and os.path.exists('/Applications/Google Chrome.app'):
-            webbrowser.get(chrome_path).open(spec['url'], new=2)
+            webbrowser.get(chrome_path).open(url, new=2)
         else:
             webbrowser.open(spec['url'], new=2)
     elif platform.platform().startswith('Windows'):
