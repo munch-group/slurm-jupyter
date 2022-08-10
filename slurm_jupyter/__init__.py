@@ -283,7 +283,7 @@ def open_jupyter_stdout_connection(spec, verbose=False):
         else:
             time.sleep(10)
 
-    cmd = 'ssh {user}@{frontend} tail --pid=`ps -o ppid= $$` -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.out'.format(**spec)
+    cmd = "ssh {user}@{frontend} 'tail --pid=`ps -o ppid= $$` -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.our'".format(**spec)
 
     if verbose: print("jupyter stdout connection:", cmd)
     return open_output_connection(cmd, spec)
@@ -312,8 +312,6 @@ def open_jupyter_stderr_connection(spec, verbose=False):
             time.sleep(10)
 
     cmd = "ssh {user}@{frontend} 'tail --pid=`ps -o ppid= $$` -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err'".format(**spec)
-
-    # cmd = 'ssh {user}@{frontend} tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err'.format(**spec)
 
     if verbose: print("jupyter stderr connection:", cmd)
     return open_output_connection(cmd, spec)
@@ -736,11 +734,10 @@ def slurm_jupyter():
                         token_url = None # server is runing, we now look for a token url
 
                     # look for the token url
-                    m = re.search('https://127.0.0.1\S+', line)
+                    m = re.search('https?://127.0.0.1\S+', line)
                     if m:
                         token_url = m.group(0)
                         spec['url'] = token_url
-                        print('URL', token_url)
                         open_browser(spec, force_chrome=args.chrome)
                         print(BLUE+' Your browser may complain that the connection is not private.\n',
                                    'In Safari, you can proceed to allow this. In Chrome, you need"\n',
@@ -750,7 +747,6 @@ def slurm_jupyter():
                     # in case we missed the token url
                     m = re.search('Use Control-C to stop this server', line)
                     if m and not token_url:
-                        print('URL here', token_url)
                         open_browser(spec, force_chrome=args.chrome)
                         print(BLUE+' Your browser may complain that the connection is not private.\n',
                                    'In Safari, you can proceed to allow this. In Chrome, you need"\n',
