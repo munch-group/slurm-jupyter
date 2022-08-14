@@ -81,7 +81,7 @@ def check_for_conda_update():
     this_version = conda_search.strip().splitlines()[-1].split()[1]
     if LooseVersion(newest_version) > LooseVersion(this_version):
         msg = '\nA newer version of slurm-jupyter exists ({}). To update run:\n'.format(newest_version)
-        msg += '\n\tconda install -c kaspermunch -c conda-forge slurm-jupyter={newest_version}\n'
+        msg += '\n\tconda install -c kaspermunch -c conda-forge slurm-jupyter={}\n'.format(newest_version)
         print(RED + msg + ENDC)
 
 
@@ -283,7 +283,8 @@ def open_jupyter_stdout_connection(spec, verbose=False):
         else:
             time.sleep(10)
 
-    cmd = "ssh {user}@{frontend} 'tail --pid=`ps -o ppid= $$` -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.our'".format(**spec)
+    # cmd = "ssh {user}@{frontend} 'tail --pid=`ps -o ppid= $$` -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.out'".format(**spec)
+    cmd = "ssh {user}@{frontend} 'tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.out'".format(**spec)
 
     if verbose: print("jupyter stdout connection:", cmd)
     return open_output_connection(cmd, spec)
@@ -311,7 +312,8 @@ def open_jupyter_stderr_connection(spec, verbose=False):
         else:
             time.sleep(10)
 
-    cmd = "ssh {user}@{frontend} 'tail --pid=`ps -o ppid= $$` -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err'".format(**spec)
+    # cmd = "ssh {user}@{frontend} 'tail --pid=`ps -o ppid= $$` -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err'".format(**spec)
+    cmd = "ssh {user}@{frontend} 'tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}.err'".format(**spec)
 
     if verbose: print("jupyter stderr connection:", cmd)
     return open_output_connection(cmd, spec)
@@ -558,6 +560,10 @@ def slurm_jupyter():
                     dest="verbose",
                     action='store_true',
                     help="Print debugging information")
+    parser.add_argument("-s", "--skip-port-check",
+                    dest="skip_port_check",
+                    action='store_true',
+                    help="Skip searching for an available port. Saves time when only running a single instance.")
 
     args = parser.parse_args()
 
@@ -608,7 +614,7 @@ def slurm_jupyter():
 
     check_for_conda_update()
 
-    if spec['port'] is None:
+    if spec['port'] is None and not args.skip_port_check:
         spec['port'] = get_cluster_uid(spec)
         if sys.platform == "darwin":
             for i in range(10):
@@ -623,7 +629,7 @@ def slurm_jupyter():
                 print(BLUE+f"Default port {spec['port']-i} in busy. Using port {spec['port']}"+ENDC)
 
     if spec['hostport'] is None:
-        spec['hostport'] = get_cluster_uid(spec)
+        spec['hostport'] = spec['port']
 
     tup = spec['walltime'].split('-')
     if len(tup) == 1:
@@ -911,9 +917,9 @@ def slurm_nb_run():
         print('Only not use --inplace with other formats than "notebook" format')
         sys.exit()
 
-    if args.cleanup and not args.spike:
-        print("Only use --cleanup with --spike")
-        sys.exit()
+    # if args.cleanup and not args.spike:
+    #     print("Only use --cleanup with --spike")
+    #     sys.exit()
 
     home = os.path.expanduser("~")
 
