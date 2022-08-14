@@ -1004,9 +1004,11 @@ def slurm_nb_run():
     gwf = Workflow(defaults={'account': args.account})
 
     def run_workflow(workflow):
-        from gwf.core import Backend, Graph, Scheduler
+        from gwf.backends import Backend
+        from gwf.core import Graph, Scheduler
         from gwf.conf import config
-
+        for t in workflow.targets.values():
+            print(t)
         graph = Graph.from_targets(workflow.targets)
         backend_cls = Backend.from_name('slurm')
 
@@ -1014,10 +1016,10 @@ def slurm_nb_run():
             scheduler = Scheduler(graph=graph, backend=backend, dry_run=False)
             scheduler.schedule_many(list(graph))
 
-    def nbconvert(notebook_file_name, dependencies=[], inplace=False, 
+    def nbconvert(notebook_file_name, output_file, dependencies=[], inplace=False, 
                   output_format='notebook', allow_errors=False, timeout=-1):
         inputs = dependencies
-        outputs = [notebook_file_name]
+        outputs = [output_file]
         options = {
             'cores': args.cores,
             'memory': args.total_memory,
@@ -1038,7 +1040,7 @@ def slurm_nb_run():
         nbconvert_cmd = "jupyter nbconvert --ClearOutputPreprocessor.enabled=True \
             --ExecutePreprocessor.timeout={timeout} {allow_errors} {inplace and '--allow-errors' or ''} \
                 --to {output_format} --execute {notebook_file_name}" && \
-        cp $TMPDIR/`basename {notebook_file_name}` {notebook_file_name}
+        cp $TMPDIR/`basename {notebook_file_name}` {output_file}
         '''
 
         return AnonymousTarget(inputs=inputs, outputs=outputs, options=options, spec=spec)
@@ -1116,12 +1118,13 @@ def slurm_nb_run():
                 new_notebook_list.append(new_notebook_path)
 
             ###################################
-            dependencies = [spike_file]
+            dependencies = [os.path.abspath(spike_file)]
             for notebook in notebook_list:
                 gwf.target_from_template(
-                    name=modpath(notebook, parent='', suffix='') + '_' + modpath(spike_file, parent='', suffix='')
+                    name=modpath(notebook, parent='', suffix='') + '_' + modpath(spike_file, parent='', suffix=''),
                     template=nbconvert(
-                        notebook_file_name=notebook,
+                        notebook_file_name=os.path.abspath(notebook),
+                        output_file=os.path.abspath(new_notebook_path),
                         dependencies=dependencies,
                         inplace=True,
                         allow_errors=False, 
@@ -1129,7 +1132,7 @@ def slurm_nb_run():
                         output_format=args.format
                     )
                 )
-                dependencies.append(notebook)
+                dependencies.append(os.path.abspath(notebook))
 
             ###################################
 
