@@ -1119,7 +1119,7 @@ def slurm_nb_run():
             dependencies = [spike_file]
             for notebook in notebook_list:
                 gwf.target_from_template(
-                    name=modpath(notebook, parent=''),
+                    name=modpath(notebook, parent='', suffix='') + '_' + modpath(spike_file, parent='', suffix='')
                     template=nbconvert(
                         notebook_file_name=notebook,
                         dependencies=dependencies,
