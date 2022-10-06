@@ -67,7 +67,7 @@ ON_POSIX = 'posix' in sys.builtin_module_names
 #             print(data, end="", file=sys.stderr)
 
 
-class TimeLimitApproaching(Exception):
+class StopServerException(Exception):
     pass
 
 def check_for_conda_update():
@@ -86,7 +86,7 @@ def check_for_conda_update():
 
 
 # Ask for confirmation on keyboard interrupt
-def kbintr_handler(signal, frame):
+def keyboard_interrupt_handler(signal, frame):
     """Intercepts KeyboardInterrupt and asks for confirmation.
     """
     # msg = BLUE+'\nAre you sure? y/n: '+ENDC
@@ -98,7 +98,7 @@ def kbintr_handler(signal, frame):
     raise KeyboardInterrupt
 
 
-def kbintr_repressor(signal, frame):
+def keyboard_interrupt_repressor(signal, frame):
     """For ignoring KeyboardInterrupt.
     """
     pass
@@ -144,9 +144,9 @@ def submit_slurm_server_job(spec, verbose=False):
     if verbose: print("slurm script:", script, sep='\n')
 
     script = script.encode()
-    stdout, stderr = execute(cmd, stdin=script) # hangs untill submission
+    stdout, stderr = execute(cmd, stdin=script) # hangs until submission
 
-    # get stdour and stderr and get jobid
+    # get stdout and stderr and get jobid
     stdout = stdout.decode()
     stderr = stderr.decode()
     try:
@@ -182,9 +182,9 @@ def submit_slurm_batch_job(spec, verbose=False):
     cmd = 'sbatch {tmp_dir}/{tmp_script} '.format(**spec)
     if verbose: print("command:", cmd, sep='\n')
    
-    stdout, stderr = execute(cmd, shell=True) # hangs untill submission
+    stdout, stderr = execute(cmd, shell=True) # hangs until submission
 
-    # get stdour and stderr and get jobid
+    # get stdout and stderr and get jobid
     stdout = stdout.decode()
     stderr = stderr.decode()
     try:
@@ -212,18 +212,32 @@ def wait_for_job_allocation(spec, verbose=False):
     # wait a bit to make sure jobinfo database is updated
     time.sleep(20)
 
+    regex = re.compile(r'(s\d+n\d+)')
     cmd = 'ssh {user}@{frontend} squeue --noheader --format %N -j {job_id}'.format(**spec)        
     stdout, stderr = execute(cmd)
     stdout = stdout.decode()
-    node_id = stdout.strip()
+    m = regex.search(stdout)
 
-    while not node_id: #not m or m.group(1) == 'None':
+    while not m or m.group(1) == 'None':
         time.sleep(10)
         stdout, stderr = execute(cmd)
         stdout = stdout.decode()
-        # m = regex.search(stdout)
-        node_id = stdout.strip()
+        m = regex.search(stdout)
+    node_id = m.group(1)
     if verbose: print(stdout)
+    
+    # cmd = 'ssh {user}@{frontend} squeue --noheader --format %N -j {job_id}'.format(**spec)        
+    # stdout, stderr = execute(cmd)
+    # stdout = stdout.decode()
+    # node_id = stdout.strip()
+
+    # while not node_id: #not m or m.group(1) == 'None':
+    #     time.sleep(10)
+    #     stdout, stderr = execute(cmd)
+    #     stdout = stdout.decode()
+    #     # m = regex.search(stdout)
+    #     node_id = stdout.strip()
+    # if verbose: print(stdout)
 
     # node_id = m.group(1)
     return node_id
@@ -519,7 +533,7 @@ def slurm_jupyter():
     """ 
 
     description = """
-    The script handles everyting required to run jupyter on the cluster but show the notebook or jupyterlab 
+    The script handles everything required to run jupyter on the cluster but show the notebook or jupyterlab 
     in your local browser."""
 
     not_wrapped = """See github.com/kaspermunch/slurm_jupyter for documentation and common use cases."""
@@ -568,13 +582,15 @@ def slurm_jupyter():
     args = parser.parse_args()
 
     if args.nodes != 1:
-        print("Multiprocessign across multiple nodes not supported yet - sorry")
+        print("Multiprocessing across multiple nodes not supported yet - sorry")
         sys.exit()
 
     if args.time[-1] in 'smhdSMHD':
         unit = args.time[-1].lower()
         value = int(args.time[:-1])
         args.time = human2walltime(**{unit:value})
+    elif not re.match(r'(\d+-)?\d+:\d+:\d+', args.time):
+        print("Wrongly formatted walltime spec:", args.time)
 
     spec = {'user': args.user,
             'port': args.port,
@@ -617,16 +633,17 @@ def slurm_jupyter():
     if spec['port'] is None and not args.skip_port_check:
         spec['port'] = get_cluster_uid(spec)
         if sys.platform == "darwin":
-            for i in range(10):
-                cmd = f"lsof -i -P | grep LISTEN | grep 'localhost:{spec['port']}'"
-                stdout, stderr = execute(cmd, shell=True, check_failure=False)
-                if not stdout.strip():
+            cmd = f"lsof -i -P | grep LISTEN"
+            stdout, stderr = execute(cmd, shell=True, check_failure=False)
+            stdout = stdout.decode()
+            for port_bump in range(10):
+                if f"localhost:{spec['port']}" not in stdout:
                     # port not in use
                     break
                 else:
                     spec['port'] += 1
-            if i:
-                print(BLUE+f"Default port {spec['port']-i} in busy. Using port {spec['port']}"+ENDC)
+            if port_bump:
+                print(BLUE+f"Default port {spec['port']-port_bump} in busy. Using port {spec['port']}"+ENDC)
 
     if spec['hostport'] is None:
         spec['hostport'] = spec['port']
@@ -661,7 +678,7 @@ def slurm_jupyter():
         spec['account_spec'] = ""
 
     # incept keyboard interrupt with user prompt
-    signal.signal(signal.SIGINT, kbintr_handler)
+    signal.signal(signal.SIGINT, keyboard_interrupt_handler)
 
     try:
         spec['job_id'] = submit_slurm_server_job(spec, verbose=args.verbose)
@@ -669,6 +686,8 @@ def slurm_jupyter():
 
         spec['node'] = wait_for_job_allocation(spec, verbose=args.verbose)
         print(BLUE+'Compute node(s) allocated:', spec['node'], ENDC)
+
+        assert spec['node']
 
         # event to communicate with threads (except memory thread)
         global RUN_EVENT
@@ -685,7 +704,7 @@ def slurm_jupyter():
 
         # open connections to stdout from memory monitoring script
         transfer_memory_script(spec, verbose=args.verbose)
-        mem_stdout_p, mem_stdout_t, mem_stdout_q = open_memory_stdout_connection(spec)
+        mem_stdout_p, mem_stdout_t, mem_stdout_q = open_memory_stdout_connection(spec, verbose=args.verbose)
 
         # # start thread monitoring memory usage
         # mem_print_t = StoppableThread(target=memory_monitor, args=[spec])
@@ -697,7 +716,7 @@ def slurm_jupyter():
             # stop to cleanup before slurm cancels the job
             if end_time - int(time.time()) < 30:
                 print('\n'+RED+'Scheduled slurm job expires in 30 sec. Stopping server.'+ENDC)
-                raise TimeLimitApproaching
+                raise StopServerException
 
             while True:
                 try:  
@@ -708,6 +727,7 @@ def slurm_jupyter():
                     line = line.decode()
                     line = line.replace('\r', '\n')
                     print(line, end="")
+
             while True:
                 try:  
                     mem_line = mem_stdout_q.get(timeout=args.timeout)#get_nowait()
@@ -722,7 +742,6 @@ def slurm_jupyter():
 
                     # if secs_left <= 5*60:
                     #     stdout, stderr = execute('ssh {user}@{frontend} pkill -9 -f "tail -F -n +1 {tmp_dir}/{tmp_name}.{job_id}"'.format(**spec))
-
 
             while True:
                 try:  
@@ -741,7 +760,7 @@ def slurm_jupyter():
 
                     # look for the token url
                     m = re.search('https?://127.0.0.1\S+', line)
-                    if m:
+                    if m and not token_url:
                         token_url = m.group(0)
                         spec['url'] = token_url
                         open_browser(spec, force_chrome=args.chrome)
@@ -758,11 +777,19 @@ def slurm_jupyter():
                                    'In Safari, you can proceed to allow this. In Chrome, you need"\n',
                                    'to simply type the characters "thisisunsafe" while in the Chrome window.\n',
                                    'Once ready, jupyter may ask for your cluster password.'+ENDC)
+
+                    if "CANCELLED" in line:
+                        print('\n'+RED+'Scheduled slurm job cancelled.'+ENDC)
+                        raise StopServerException  
+
+                    if "EnvironmentNameNotFound" in line:
+                        print('\n'+RED+'Specified environment does not exist.'+ENDC)
+                        raise StopServerException  
                                    
-    except TimeLimitApproaching:
+    except StopServerException:
 
         # not possible to do Keyboard interrupt from here on out
-        signal.signal(signal.SIGINT, kbintr_repressor)
+        signal.signal(signal.SIGINT, keyboard_interrupt_repressor)
 
         # TODO: Double Ctrl-C bypasses canceling of slurm job
 
@@ -802,7 +829,7 @@ def slurm_jupyter():
     except KeyboardInterrupt:
 
         # not possible to do Keyboard interrupt from here on out
-        signal.signal(signal.SIGINT, kbintr_repressor)
+        signal.signal(signal.SIGINT, keyboard_interrupt_repressor)
 
         # TODO: Double Ctrl-C bypasses canceling of slurm job
 

@@ -16,6 +16,9 @@ slurm_batch_script =  """#!/bin/sh
 {sources_loaded}
 ##cd "{cwd}"
 
+# Set nr of cores available to NumExpr
+export NUMEXPR_MAX_THREADS={nr_cores}
+
 {commands}
 """
 
