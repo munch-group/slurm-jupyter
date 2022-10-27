@@ -15,6 +15,7 @@ import signal
 from textwrap import wrap
 from distutils.version import LooseVersion
 from packaging import version
+from datetime import datetime
 
 from subprocess import PIPE, Popen
 from threading  import Thread, Event, Timer
@@ -156,7 +157,7 @@ def submit_slurm_server_job(spec, verbose=False):
         print(stdout)
         print(stderr)
         sys.exit()
-    print(BLUE+"Submitted slurm with job id:", job_id, ENDC)
+    print(BLUE+log_prefix()+"Submitted slurm with job id:", job_id, ENDC)
 
     return job_id
 
@@ -371,7 +372,7 @@ def open_port(spec, verbose=False):
     Returns:
         (subprocess.Popen, threading.Thread, Queue.Queue): Process, Thread and Queue.
     """
-    cmd = 'ssh -L{port}:{node}.genomedk.net:{hostport} {user}@{frontend}'.format(**spec)
+    cmd = 'ssh -L{port}:{node}:{hostport} {user}@{frontend}'.format(**spec)
     if verbose: print("forwarding port:", cmd)
     port_p = Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
     # we have to set stdin=PIPE even though we eodn't use it because this
@@ -528,6 +529,9 @@ def add_slurm_arguments(parser):
                     help="Start an ipcluster")                    
 
 
+def log_prefix():
+    return f'[I {str(datetime.now())[:-3]} SlurmJptr] '
+
 def slurm_jupyter():
     """Command line script for use on a local machine. Runs and connects to a jupyter server on a slurm node.
     """ 
@@ -637,13 +641,14 @@ def slurm_jupyter():
             stdout, stderr = execute(cmd, shell=True, check_failure=False)
             stdout = stdout.decode()
             for port_bump in range(10):
+                if args.verbose: print(f"Checking if port {spec['port']} is free")
                 if f"localhost:{spec['port']}" not in stdout:
                     # port not in use
                     break
                 else:
                     spec['port'] += 1
             if port_bump:
-                print(BLUE+f"Default port {spec['port']-port_bump} in busy. Using port {spec['port']}"+ENDC)
+                print(BLUE+log_prefix()+f"Default port {spec['port']-port_bump} in busy. Using port {spec['port']}"+ENDC)
 
     if spec['hostport'] is None:
         spec['hostport'] = spec['port']
@@ -682,10 +687,10 @@ def slurm_jupyter():
 
     try:
         spec['job_id'] = submit_slurm_server_job(spec, verbose=args.verbose)
-        print(BLUE+'Waiting for slurm job allocation'+ENDC)
+        print(BLUE+log_prefix()+'Waiting for slurm job allocation'+ENDC)
 
         spec['node'] = wait_for_job_allocation(spec, verbose=args.verbose)
-        print(BLUE+'Compute node(s) allocated:', spec['node'], ENDC)
+        print(BLUE+log_prefix()+'Compute node(s) allocated:', spec['node'], ENDC)
 
         assert spec['node']
 
@@ -694,7 +699,7 @@ def slurm_jupyter():
         RUN_EVENT = Event()
         RUN_EVENT.set()
 
-        print(BLUE+'Jupyter server: (to stop the server press Ctrl-C)'+ENDC)
+        print(BLUE+log_prefix()+'Jupyter server: (to stop the server press Ctrl-C)'+ENDC)
 
         time.sleep(5)
 
@@ -715,7 +720,7 @@ def slurm_jupyter():
 
             # stop to cleanup before slurm cancels the job
             if end_time - int(time.time()) < 30:
-                print('\n'+RED+'Scheduled slurm job expires in 30 sec. Stopping server.'+ENDC)
+                print('\n'+RED+log_prefix()+'Scheduled slurm job expires in 30 sec. Stopping server.'+ENDC)
                 raise StopServerException
 
             while True:
@@ -734,10 +739,11 @@ def slurm_jupyter():
                 except Empty:
                     break
                 else:
-                    mem_line = mem_line.decode().rstrip() 
+                    mem_line = mem_line.decode().strip() 
                     secs_left = end_time - int(time.time())
                     color = secs_left > 600 and BLUE or RED
-                    mem_line += '\t'+color+'Time: '+seconds2string(secs_left)+ENDC
+                    mem_line += '  '+color+'Time: '+seconds2string(secs_left)+ENDC
+                    mem_line = color+log_prefix()+ENDC + mem_line
                     print(mem_line)
 
                     # if secs_left <= 5*60:
@@ -764,26 +770,28 @@ def slurm_jupyter():
                         token_url = m.group(0)
                         spec['url'] = token_url
                         open_browser(spec, force_chrome=args.chrome)
-                        print(BLUE+' Your browser may complain that the connection is not private.\n',
-                                   'In Safari, you can proceed to allow this. In Chrome, you need"\n',
-                                   'to simply type the characters "thisisunsafe" while in the Chrome window.\n',
-                                   'Once ready, jupyter may ask for your cluster password.'+ENDC)
+                        prefix = log_prefix()
+                        print(BLUE+prefix+'Your browser may complain that the connection is not private.\n',
+                                   prefix+' In Safari, you can proceed to allow this. In Chrome, you need"\n',
+                                   prefix+' to simply type the characters "thisisunsafe" while in the Chrome window.\n',
+                                   prefix+' Once ready, jupyter may ask for your cluster password.'+ENDC, sep='')
 
                     # in case we missed the token url
                     m = re.search('Use Control-C to stop this server', line)
                     if m and not token_url:
                         open_browser(spec, force_chrome=args.chrome)
-                        print(BLUE+' Your browser may complain that the connection is not private.\n',
-                                   'In Safari, you can proceed to allow this. In Chrome, you need"\n',
-                                   'to simply type the characters "thisisunsafe" while in the Chrome window.\n',
-                                   'Once ready, jupyter may ask for your cluster password.'+ENDC)
+                        prefix = log_prefix()
+                        print(BLUE+prefix+'Your browser may complain that the connection is not private.\n',
+                                   prefix+' In Safari, you can proceed to allow this. In Chrome, you need"\n',
+                                   prefix+' to simply type the characters "thisisunsafe" while in the Chrome window.\n',
+                                   prefix+' Once ready, jupyter may ask for your cluster password.'+ENDC, sep='')
 
                     if "CANCELLED" in line:
-                        print('\n'+RED+'Scheduled slurm job cancelled.'+ENDC)
+                        print('\n'+RED+log_prefix()+'Scheduled slurm job cancelled.'+ENDC)
                         raise StopServerException  
 
                     if "EnvironmentNameNotFound" in line:
-                        print('\n'+RED+'Specified environment does not exist.'+ENDC)
+                        print('\n'+RED+log_prefix()+'Specified environment does not exist.'+ENDC)
                         raise StopServerException  
                                    
     except StopServerException:

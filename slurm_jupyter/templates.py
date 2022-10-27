@@ -113,7 +113,7 @@ def memory_status(max_proportion):
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             pass
 
-    width = 50
+    width = 40
     proportion = used_mem / reserved_mem
     max_proportion = max(proportion, max_proportion)
     n = int(round(proportion * width, 0))
