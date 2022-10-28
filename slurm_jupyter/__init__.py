@@ -778,13 +778,13 @@ def slurm_jupyter():
 
                     # in case we missed the token url
                     m = re.search('Use Control-C to stop this server', line)
-                    if m and not token_url:
-                        open_browser(spec, force_chrome=args.chrome)
-                        prefix = log_prefix()
-                        print(BLUE+prefix+'Your browser may complain that the connection is not private.\n',
-                                   prefix+' In Safari, you can proceed to allow this. In Chrome, you need"\n',
-                                   prefix+' to simply type the characters "thisisunsafe" while in the Chrome window.\n',
-                                   prefix+' Once ready, jupyter may ask for your cluster password.'+ENDC, sep='')
+                    # if m and not token_url:
+                    #     open_browser(spec, force_chrome=args.chrome)
+                    #     prefix = log_prefix()
+                    #     print(BLUE+prefix+'Your browser may complain that the connection is not private.\n',
+                    #                prefix+' In Safari, you can proceed to allow this. In Chrome, you need"\n',
+                    #                prefix+' to simply type the characters "thisisunsafe" while in the Chrome window.\n',
+                    #                prefix+' Once ready, jupyter may ask for your cluster password.'+ENDC, sep='')
 
                     if "CANCELLED" in line:
                         print('\n'+RED+log_prefix()+'Scheduled slurm job cancelled.'+ENDC)
