@@ -1,6 +1,8 @@
 import os
 import sys
 from subprocess import PIPE, Popen
+import shlex
+import shutil
 
 def seconds2string(sec):
     """Convert seconds to slurm time spec.
@@ -35,7 +37,7 @@ def execute(cmd, stdin=None, shell=False, check_failure=True):
     if shell:
         process = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, shell=True)
     else:
-        process = Popen(cmd.split(), stdin=PIPE, stdout=PIPE, stderr=PIPE)
+        process = Popen(shlex.split(cmd), stdin=PIPE, stdout=PIPE, stderr=PIPE)
     stdout, stderr = process.communicate(stdin)
     if check_failure:
         assert not process.returncode

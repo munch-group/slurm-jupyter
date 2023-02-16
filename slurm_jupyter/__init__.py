@@ -21,6 +21,8 @@ from subprocess import PIPE, Popen
 from threading  import Thread, Event, Timer
 import webbrowser
 
+import shlex
+
 from colorama import init
 init()
 
@@ -75,10 +77,10 @@ def check_for_conda_update():
     """Checks for a more recent conda version and prints a message.
     """
     cmd = 'conda search -c kaspermunch slurm-jupyter'
-    conda_search = subprocess.check_output(cmd, shell=True).decode()
+    conda_search = subprocess.check_output(shlex.split(cmd), shell=False).decode()
     newest_version = conda_search.strip().splitlines()[-1].split()[1]
     cmd = 'conda list -f slurm-jupyter'
-    conda_search = subprocess.check_output(cmd, shell=True).decode()
+    conda_search = subprocess.check_output(shlex.split(cmd), shell=False).decode()
     this_version = conda_search.strip().splitlines()[-1].split()[1]
     if LooseVersion(newest_version) > LooseVersion(this_version):
         msg = '\nA newer version of slurm-jupyter exists ({}). To update run:\n'.format(newest_version)
@@ -115,8 +117,8 @@ def get_cluster_uid(spec):
         int: User id.
     """
     process = Popen(
-        'ssh {user}@{frontend} id'.format(**spec),
-        shell=True,
+        shlex.split('ssh {user}@{frontend} id'.format(**spec)),
+        shell=False,
         universal_newlines=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE)
@@ -183,7 +185,7 @@ def submit_slurm_batch_job(spec, verbose=False):
     cmd = 'sbatch {tmp_dir}/{tmp_script} '.format(**spec)
     if verbose: print("command:", cmd, sep='\n')
    
-    stdout, stderr = execute(cmd, shell=True) # hangs until submission
+    stdout, stderr = execute(cmd, shell=False) # hangs until submission
 
     # get stdout and stderr and get jobid
     stdout = stdout.decode()
@@ -268,7 +270,7 @@ def open_output_connection(cmd, spec):
         (subprocess.Popen, threading.Thread, Queue.Queue): Process, Thread and Queue.
     """      
     # p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=ON_POSIX)
-    p = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=ON_POSIX)
+    p = Popen(shlex.split(cmd), shell=False, stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=ON_POSIX)
     q = Queue()
     t = Thread(target=enqueue_output, args=(p.stdout, q))
     t.daemon = True # thread dies with the program
@@ -372,9 +374,9 @@ def open_port(spec, verbose=False):
     Returns:
         (subprocess.Popen, threading.Thread, Queue.Queue): Process, Thread and Queue.
     """
-    cmd = 'ssh -L{port}:{node}:{hostport} {user}@{frontend}'.format(**spec)
+    cmd = 'ssh -L {port}:{node}:{hostport} {user}@{frontend}'.format(**spec)
     if verbose: print("forwarding port:", cmd)
-    port_p = Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+    port_p = Popen(shlex.split(cmd), shell=False, stdin=PIPE, stdout=PIPE, stderr=PIPE)
     # we have to set stdin=PIPE even though we eodn't use it because this
     # makes sure the process does not inherrit stdin from the parent process (this).
     # Otherwise signals are sent to the process and not to the python script
@@ -431,7 +433,7 @@ def check_jupyterlab_version(spec):
     """
     process = Popen(
         'ssh {user}@{frontend} "conda activate simons_jupyter && conda list | grep grep \"jupyterlab \""'.format(**spec),
-        shell=True,
+        shell=False,
         universal_newlines=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE)
@@ -622,8 +624,8 @@ def slurm_jupyter():
 
     # test ssh connection:
     process = subprocess.Popen(
-        'ssh -q {user}@{frontend} exit'.format(**spec),
-        shell=True,
+        shlex.split('ssh -q {user}@{frontend} exit'.format(**spec)),
+        shell=False,
         universal_newlines=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE)
@@ -638,7 +640,7 @@ def slurm_jupyter():
         spec['port'] = get_cluster_uid(spec)
         if sys.platform == "darwin":
             cmd = f"lsof -i -P | grep LISTEN"
-            stdout, stderr = execute(cmd, shell=True, check_failure=False)
+            stdout, stderr = execute(cmd, shell=False, check_failure=False)
             stdout = stdout.decode()
             for port_bump in range(10):
                 if args.verbose: print(f"Checking if port {spec['port']} is free")
