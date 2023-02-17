@@ -22,6 +22,7 @@ from threading  import Thread, Event, Timer
 import webbrowser
 
 import shlex
+import shutil
 
 from colorama import init
 init()
@@ -77,10 +78,14 @@ def check_for_conda_update():
     """Checks for a more recent conda version and prints a message.
     """
     cmd = 'conda search -c kaspermunch slurm-jupyter'
-    conda_search = subprocess.check_output(shlex.split(cmd), shell=False).decode()
+    cmd = shlex.split(cmd)
+    cmd[0] = shutil.which(cmd[0])    
+    conda_search = subprocess.check_output(cmd, shell=False).decode()
     newest_version = conda_search.strip().splitlines()[-1].split()[1]
     cmd = 'conda list -f slurm-jupyter'
-    conda_search = subprocess.check_output(shlex.split(cmd), shell=False).decode()
+    cmd = shlex.split(cmd)
+    cmd[0] = shutil.which(cmd[0])    
+    conda_search = subprocess.check_output(cmd, shell=False).decode()
     this_version = conda_search.strip().splitlines()[-1].split()[1]
     if LooseVersion(newest_version) > LooseVersion(this_version):
         msg = '\nA newer version of slurm-jupyter exists ({}). To update run:\n'.format(newest_version)
@@ -116,8 +121,10 @@ def get_cluster_uid(spec):
     Returns:
         int: User id.
     """
+    cmd = shlex.split('ssh {user}@{frontend} id'.format(**spec))
+    cmd[0] = shutil.which(cmd[0]) 
     process = Popen(
-        shlex.split('ssh {user}@{frontend} id'.format(**spec)),
+        cmd,
         shell=False,
         universal_newlines=True,
         stdout=subprocess.PIPE,
@@ -184,7 +191,7 @@ def submit_slurm_batch_job(spec, verbose=False):
 
     cmd = 'sbatch {tmp_dir}/{tmp_script} '.format(**spec)
     if verbose: print("command:", cmd, sep='\n')
-   
+
     stdout, stderr = execute(cmd, shell=False) # hangs until submission
 
     # get stdout and stderr and get jobid
@@ -270,7 +277,9 @@ def open_output_connection(cmd, spec):
         (subprocess.Popen, threading.Thread, Queue.Queue): Process, Thread and Queue.
     """      
     # p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=ON_POSIX)
-    p = Popen(shlex.split(cmd), shell=False, stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=ON_POSIX)
+    cmd = shlex.split(cmd)
+    cmd[0] = shutil.which(cmd[0])     
+    p = Popen(cmd, shell=False, stdout=PIPE, stderr=PIPE, bufsize=0, close_fds=ON_POSIX)
     q = Queue()
     t = Thread(target=enqueue_output, args=(p.stdout, q))
     t.daemon = True # thread dies with the program
@@ -376,7 +385,9 @@ def open_port(spec, verbose=False):
     """
     cmd = 'ssh -L {port}:{node}:{hostport} {user}@{frontend}'.format(**spec)
     if verbose: print("forwarding port:", cmd)
-    port_p = Popen(shlex.split(cmd), shell=False, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+    cmd = shlex.split(cmd)
+    cmd[0] = shutil.which(cmd[0])        
+    port_p = Popen(cmd, shell=False, stdin=PIPE, stdout=PIPE, stderr=PIPE)
     # we have to set stdin=PIPE even though we eodn't use it because this
     # makes sure the process does not inherrit stdin from the parent process (this).
     # Otherwise signals are sent to the process and not to the python script
@@ -431,8 +442,11 @@ def check_jupyterlab_version(spec):
     Returns:
         bool: whether version is 3
     """
+    cmd = 'ssh {user}@{frontend} "conda activate simons_jupyter && conda list | grep grep \"jupyterlab \""'.format(**spec)
+    cmd = shlex.split(cmd)
+    cmd[0] = shutil.which(cmd[0])    
     process = Popen(
-        'ssh {user}@{frontend} "conda activate simons_jupyter && conda list | grep grep \"jupyterlab \""'.format(**spec),
+        cmd,
         shell=False,
         universal_newlines=True,
         stdout=subprocess.PIPE,
@@ -623,8 +637,11 @@ def slurm_jupyter():
 
 
     # test ssh connection:
+    cmd = 'ssh -q {user}@{frontend} exit'.format(**spec)
+    cmd = shlex.split(cmd)
+    cmd[0] = shutil.which(cmd[0])  
     process = subprocess.Popen(
-        shlex.split('ssh -q {user}@{frontend} exit'.format(**spec)),
+        cmd,
         shell=False,
         universal_newlines=True,
         stdout=subprocess.PIPE,
@@ -639,7 +656,7 @@ def slurm_jupyter():
     if spec['port'] is None and not args.skip_port_check:
         spec['port'] = get_cluster_uid(spec)
         if sys.platform == "darwin":
-            cmd = f"lsof -i -P | grep LISTEN"
+            cmd = f"lsof -i -P | grep LISTEN"           
             stdout, stderr = execute(cmd, shell=False, check_failure=False)
             stdout = stdout.decode()
             for port_bump in range(10):
