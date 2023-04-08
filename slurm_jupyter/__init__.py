@@ -356,18 +356,12 @@ def open_memory_stdout_connection(spec, verbose=False):
     Returns:
         (subprocess.Popen, threading.Thread, Queue.Queue): Process, Thread and Queue.
     """     
-
     # cmd = 'ssh {user}@{frontend} "echo \\\"trap \\\'kill -HUP $(jobs -lp) 2>/dev/null || true\\\' exit; ssh {user}@{node} python {tmp_dir}/mem_jupyter.py\\\" > {tmp_dir}/{tmp_name}.{job_id}.mem.sh"'.format(**spec)
-
     # cmd = 'ssh {user}@{frontend} "echo \\\"trap \\\'kill -HUP -$$\\\' exit; ssh {user}@{node} python {tmp_dir}/mem_jupyter.py\\\" > {tmp_dir}/{tmp_name}.{job_id}.mem.sh"'.format(**spec)
-
     # cmd = 'ssh {user}@{frontend} "echo \\\"trap \\\'kill -9 $(ps -s $$ -o pid=)\\\' exit; ssh {user}@{node} python {tmp_dir}/mem_jupyter.py\\\" > {tmp_dir}/{tmp_name}.{job_id}.mem.sh"'.format(**spec)
     # cmd = 'ssh {user}@{frontend} "bash {tmp_dir}/{tmp_name}.{job_id}.mem.sh"'.format(**spec)
-
     # cmd = 'ssh -t -t {user}@{frontend} ssh {user}@{node} python {tmp_dir}/mem_jupyter.py'.format(**spec)
-
-    cmd = 'ssh {user}@{frontend} ssh {user}@{node} python {tmp_dir}/mem_jupyter.py'.format(**spec)
-
+    cmd = 'ssh {user}@{frontend} ssh {user}@{node} conda run -n {environment_name} --no-capture-output python {tmp_dir}/mem_jupyter.py'.format(**spec)
 
     if verbose: print("memory stdout connection:", cmd)
     return open_output_connection(cmd, spec)
@@ -690,6 +684,7 @@ def slurm_jupyter():
 
     if args.environment:
         spec['environment'] = "\nconda activate " + args.environment
+        spec['environment_name'] = args.environment
 
     if args.ipcluster:
         spec['ipcluster'] = "ipcluster start -n {} &".format(args.cores)
@@ -1018,6 +1013,7 @@ def slurm_nb_run():
 
     if args.environment:
         spec['environment'] = "\nsource activate " + args.environment
+        spec['environment_name'] = args.environment
 
     if args.account:
         spec['account_spec'] = "#SBATCH -A {}".format(args.account)
