@@ -647,6 +647,7 @@ def slurm_jupyter():
 
     check_for_conda_update()
 
+    # TODO: test port check and make sure it works
     if spec['port'] is None and not args.skip_port_check:
         spec['port'] = get_cluster_uid(spec)
         if sys.platform == "darwin":
