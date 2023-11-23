@@ -648,11 +648,11 @@ def slurm_jupyter():
     check_for_conda_update()
 
     # TODO: test port check and make sure it works
-    if spec['port'] is None and not args.skip_port_check:
-        spec['port'] = get_cluster_uid(spec)
+    if spec['port'] is None and spec['hostport'] is None and not args.skip_port_check:
+        spec['port'] = get_cluster_uid(spec)        
         if sys.platform == "darwin":
             cmd = f"lsof -i -P | grep LISTEN"           
-            stdout, stderr = execute(cmd, shell=False, check_failure=False)
+            stdout, stderr = execute(cmd, shell=True, check_failure=False)
             stdout = stdout.decode()
             for port_bump in range(10):
                 if args.verbose: print(f"Checking if port {spec['port']} is free")
