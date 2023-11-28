@@ -37,7 +37,7 @@ slurm_server_script =  """#!/bin/sh
 {sources_loaded}
 ##cd "{cwd}"
 
-if [ -d "$HOME/miniconda3" ]
+if [ "{package_manager}" == "miniconda3" ] && [ -d "$HOME/miniconda3" ]
 then
     # >>> conda initialize >>>
     # !! Contents within this block are managed by 'conda init' !!
@@ -53,7 +53,7 @@ then
     fi
     unset __conda_setup
     # <<< conda initialize <<<
-elif  [ -d "$HOME/mambaforge" ]
+elif [ "{package_manager}" == "mambaforge" ] && [ -d "$HOME/mambaforge" ]
 then
     # >>> conda initialize >>>
     # !! Contents within this block are managed by 'conda init' !!
@@ -73,7 +73,7 @@ then
         . "$HOME/mambaforge/etc/profile.d/mamba.sh"
     fi
     # <<< conda initialize <<<
-elif  [ -d "$HOME/miniforge3" ]
+elif [ "{package_manager}" == "miniforge3" ] && [ -d "$HOME/miniforge3" ]
 then
     # >>> conda initialize >>>
     # !! Contents within this block are managed by 'conda init' !!
@@ -93,7 +93,8 @@ then
         . "$HOME/miniforge3/etc/profile.d/mamba.sh"
     fi
     # <<< conda initialize <<<
-else
+elif [ "{package_manager}" == "anaconda3" ] && [ -d "$HOME/anaconda3" ]
+then
     # >>> conda initialize >>>
     # !! Contents within this block are managed by 'conda init' !!
     __conda_setup="$('$HOME/anaconda3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"

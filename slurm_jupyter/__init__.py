@@ -629,6 +629,7 @@ def slurm_jupyter():
             'job_id': None,
             'url': None}
 
+    check_for_conda_update()
 
     # test ssh connection:
     cmd = 'ssh -q {user}@{frontend} exit'.format(**spec)
@@ -645,7 +646,24 @@ def slurm_jupyter():
         print("Cannot make ssh connection: {user}@{frontend}".format(**spec))
         sys.exit()
 
-    check_for_conda_update()
+    # get environment manager:
+    cmd = """ssh -q {user}@{frontend} 'conda info --envs | sed -n "s/^base\s*\*\s*\/home\/$USER\/\(.*\)/\\1/p"' """.format(**spec)
+    process = subprocess.Popen(
+        cmd,
+        shell=True,
+        universal_newlines=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE)
+    stdout, stderr = process.communicate()
+    if process.returncode:
+        print("Cannot make ssh connection: {user}@{frontend}".format(**spec))
+        sys.exit()
+    else:
+        spec['package_manager'] = stdout.strip()
+
+    if not spec['package_manager'] or spec['package_manager'] not in ['miniconda3', 'anaconda3', 'miniforge3', 'mambaforge']:
+        print("Cannot find cluster package mannager. Are you using either miniconda3, anaconda3, miniforge3, or mambaforge ?")
+        sys.exit()
 
     # TODO: test port check and make sure it works
     if spec['port'] is None and spec['hostport'] is None and not args.skip_port_check:
