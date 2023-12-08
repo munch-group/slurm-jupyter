@@ -661,7 +661,12 @@ def slurm_jupyter():
     else:
         spec['package_manager'] = stdout.strip()
 
-    if not spec['package_manager'] or not any(x in spec['package_manager'] for x in ['miniconda3', 'anaconda3', 'miniforge3', 'mambaforge']):
+    # in case the cluster bash string comes back with profile formatting around the manager name
+    for manager in ['miniconda3', 'anaconda3', 'miniforge3', 'mambaforge']:
+        if manager in spec['package_manager']:
+            spec['package_manager'] = manager
+
+    if not spec['package_manager'] or spec['package_manager'] not in ['miniconda3', 'anaconda3', 'miniforge3', 'mambaforge']:
         print("Cannot find cluster package mannager. Are you using either miniconda3, anaconda3, miniforge3, or mambaforge ?")
         sys.exit()
 
