@@ -222,7 +222,7 @@ def wait_for_job_allocation(spec, verbose=False):
     # wait a bit to make sure jobinfo database is updated
     time.sleep(20)
 
-    regex = re.compile(r'(s\d+n\d+|c-\d+)')
+    regex = re.compile(r'(s\d+n\d+|cn-\d+)')
     cmd = 'ssh {user}@{frontend} squeue --noheader --format %N -j {job_id}'.format(**spec)        
     stdout, stderr = execute(cmd)
     stdout = stdout.decode()
