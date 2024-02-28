@@ -1,6 +1,6 @@
 
 # clean slate
-rm -rf conda output
+rm -rf conda outputdir
 conda-build purge-all
 
 conda config --set anaconda_upload yes
