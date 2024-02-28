@@ -510,8 +510,8 @@ def add_slurm_arguments(parser):
     parser.add_argument("-N", "--name",
                     dest="name",
                     type=str,
-                    default="jptr_{}_{}".format(getpass.getuser(), int(time.time())),
-                    help="Name of job. Only needed if you run multiple servers and want to be able to recognize a particular one in the cluster queue.")
+                    default="jptr",
+                    help="Name prefix of job. Only needed if you run multiple servers and want to be able to recognize a particular one in the cluster queue.")
     parser.add_argument("-u", "--user",
                     dest="user",
                     type=str,
@@ -521,6 +521,7 @@ def add_slurm_arguments(parser):
                     dest="environment",
                     type=str,
                     default='',
+                    required=True,                    
                     help="Conda environment to run jupyter in.")
     parser.add_argument("-A", "--account",
                     dest="account",
@@ -588,6 +589,11 @@ def slurm_jupyter():
                     dest="verbose",
                     action='store_true',
                     help="Print debugging information")
+    parser.add_argument("-a", "--attach",
+                    dest="attach",
+                    type=str,
+                    default=None,
+                    help="job id of running jupyter server")
     parser.add_argument("-s", "--skip-port-check",
                     dest="skip_port_check",
                     action='store_true',
@@ -608,7 +614,8 @@ def slurm_jupyter():
 
     spec = {'user': args.user,
             'port': args.port,
-            'environment': args.environment,
+            'environment': "\nconda activate " + args.environment,
+            'environment_name': args.environment,
             'run': args.run,
             'walltime': args.time,
             'account': args.account,
@@ -625,7 +632,7 @@ def slurm_jupyter():
             'tmp_dir': '.slurm_jupyter',
             'frontend': args.frontend,
             'hostport': args.hostport,
-            'job_name': args.name,
+            'job_name': "{}_{}_{}_{}".format(args.name, getpass.getuser(), args.environment, int(time.time())),
             'job_id': None,
             'url': None}
 
@@ -646,100 +653,140 @@ def slurm_jupyter():
         print("Cannot make ssh connection: {user}@{frontend}".format(**spec))
         sys.exit()
 
-    # get environment manager:
-    cmd = """ssh -q {user}@{frontend} 'conda info --envs | sed -n "s/^base\s*\*\s*\/home\/$USER\/\(.*\)/\\1/p"' """.format(**spec)
-    process = subprocess.Popen(
-        cmd,
-        shell=True,
-        universal_newlines=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE)
-    stdout, stderr = process.communicate()
-    if process.returncode:
-        print("Cannot make ssh connection: {user}@{frontend}".format(**spec))
-        sys.exit()
-    else:
-        spec['package_manager'] = stdout.strip()
+    if not args.attach:
+        # check environment exists on the cluster:
+        cmd = 'ssh kmt@login.genome.au.dk "conda info --envs | grep \'{environment_name}\s\'"'.format(**spec)
+        if args.verbose: print(cmd)
+        stdout, stderr = execute(cmd)
+        if args.verbose: print(stdout)
+        if not args.attach:
+            if process.returncode or stdout.decode().split()[0] != spec['environment_name']:
+                print("Specified environment {environment} was not found on the cluster: {user}@{frontend}".format(**spec))
+                sys.exit()
 
-    # in case the cluster bash string comes back with profile formatting around the manager name
-    for manager in ['miniconda3', 'anaconda3', 'miniforge3', 'mambaforge']:
-        if manager in spec['package_manager']:
-            spec['package_manager'] = manager
+        # get environment manager:
+        cmd = """ssh -q {user}@{frontend} 'conda info --envs | sed -n "s/^base\s*\*\s*\/home\/$USER\/\(.*\)/\\1/p"' """.format(**spec)
+        process = subprocess.Popen(
+            cmd,
+            shell=True,
+            universal_newlines=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate()
+        if process.returncode:
+            print("Cannot make ssh connection: {user}@{frontend}".format(**spec))
+            sys.exit()
+        else:
+            spec['package_manager'] = stdout.strip()
 
-    if not spec['package_manager'] or spec['package_manager'] not in ['miniconda3', 'anaconda3', 'miniforge3', 'mambaforge']:
-        print("Cannot find cluster package mannager. Are you using either miniconda3, anaconda3, miniforge3, or mambaforge ?")
-        sys.exit()
+        # in case the cluster bash string comes back with profile formatting around the manager name
+        for manager in ['miniconda3', 'anaconda3', 'miniforge3', 'mambaforge']:
+            if manager in spec['package_manager']:
+                spec['package_manager'] = manager
 
-    # TODO: test port check and make sure it works
-    if spec['port'] is None and spec['hostport'] is None and not args.skip_port_check:
-        spec['port'] = get_cluster_uid(spec)        
-        if sys.platform == "darwin":
-            cmd = f"lsof -i -P | grep LISTEN"           
-            stdout, stderr = execute(cmd, shell=True, check_failure=False)
-            stdout = stdout.decode()
-            for port_bump in range(10):
-                if args.verbose: print(f"Checking if port {spec['port']} is free")
-                if f"localhost:{spec['port']}" not in stdout:
-                    # port not in use
-                    break
-                else:
-                    spec['port'] += 1
-            if port_bump:
-                print(BLUE+log_prefix()+f"Default port {spec['port']-port_bump} in busy. Using port {spec['port']}"+ENDC)
+        if not spec['package_manager'] or spec['package_manager'] not in ['miniconda3', 'anaconda3', 'miniforge3', 'mambaforge']:
+            print("Cannot find cluster package mannager. Are you using either miniconda3, anaconda3, miniforge3, or mambaforge ?")
+            sys.exit()
 
-    if spec['hostport'] is None:
-        spec['hostport'] = spec['port']
+        # TODO: test port check and make sure it works
+        if spec['port'] is None and spec['hostport'] is None and not args.skip_port_check:
+            spec['port'] = get_cluster_uid(spec)        
+            if sys.platform == "darwin":
+                cmd = f"lsof -i -P | grep LISTEN"           
+                stdout, stderr = execute(cmd, shell=True, check_failure=False)
+                stdout = stdout.decode()
+                for port_bump in range(10):
+                    if args.verbose: print(f"Checking if port {spec['port']} is free")
+                    if f"localhost:{spec['port']}" not in stdout:
+                        # port not in use
+                        break
+                    else:
+                        spec['port'] += 1
+                if port_bump:
+                    print(BLUE+log_prefix()+f"Default port {spec['port']-port_bump} in busy. Using port {spec['port']}"+ENDC)
 
-    tup = spec['walltime'].split('-')
-    if len(tup) == 1:
-        days, (hours, mins, secs) = 0, tup[0].split(':')
-    else:
-        days, (hours, mins, secs) = tup[0], tup[1].split(':')
-    end_time = int(time.time()) + int(days) * 86400 + int(hours) * 3600 + int(mins) * 60 + int(secs)
+        if spec['hostport'] is None:
+            spec['hostport'] = spec['port']
 
-    spec['gres'] = ''
-    if args.queue == 'gpu':
-        spec['gres'] = '#SBATCH --gres=gpu:1'
-        
-    if args.total_memory:
-        spec['memory_spec'] = '#SBATCH --mem {}'.format(int(str_to_mb(args.total_memory)))
-    else:
-        spec['memory_spec'] = '#SBATCH --mem-per-cpu {}'.format(int(str_to_mb(args.memory_per_cpu)))
+        # tup = spec['walltime'].split('-')
+        # if len(tup) == 1:
+        #     days, (hours, mins, secs) = 0, tup[0].split(':')
+        # else:
+        #     days, (hours, mins, secs) = tup[0], tup[1].split(':')
+        # end_time = int(time.time()) + int(days) * 86400 + int(hours) * 3600 + int(mins) * 60 + int(secs)
 
-    if args.environment:
-        spec['environment'] = "\nconda activate " + args.environment
-        spec['environment_name'] = args.environment
+        spec['gres'] = ''
+        if args.queue == 'gpu':
+            spec['gres'] = '#SBATCH --gres=gpu:1'
+            
+        if args.total_memory:
+            spec['memory_spec'] = '#SBATCH --mem {}'.format(int(str_to_mb(args.total_memory)))
+        else:
+            spec['memory_spec'] = '#SBATCH --mem-per-cpu {}'.format(int(str_to_mb(args.memory_per_cpu)))
 
-    if args.ipcluster:
-        spec['ipcluster'] = "ipcluster start -n {} &".format(args.cores)
-    else:   
-        spec['ipcluster'] = ''
+        # if args.environment:
+        #     spec['environment'] = "\nconda activate " + args.environment
+        #     spec['environment_name'] = args.environment
 
-    if args.account:
-        spec['account_spec'] = "#SBATCH -A {}".format(args.account)
-    else:
-        spec['account_spec'] = ""
+        if args.ipcluster:
+            spec['ipcluster'] = "ipcluster start -n {} &".format(args.cores)
+        else:   
+            spec['ipcluster'] = ''
+
+        if args.account:
+            spec['account_spec'] = "#SBATCH -A {}".format(args.account)
+        else:
+            spec['account_spec'] = ""
+
 
     # incept keyboard interrupt with user prompt
     signal.signal(signal.SIGINT, keyboard_interrupt_handler)
 
     try:
-        spec['job_id'] = submit_slurm_server_job(spec, verbose=args.verbose)
-        print(BLUE+log_prefix()+'Waiting for slurm job allocation'+ENDC)
-
-        spec['node'] = wait_for_job_allocation(spec, verbose=args.verbose)
-        print(BLUE+log_prefix()+'Compute node(s) allocated:', spec['node'], ENDC)
-
-        assert spec['node']
 
         # event to communicate with threads (except memory thread)
         global RUN_EVENT
         RUN_EVENT = Event()
         RUN_EVENT.set()
 
-        print(BLUE+log_prefix()+'Jupyter server: (to stop the server press Ctrl-C)'+ENDC)
+        if args.attach:
+            # populate spec
+            spec['job_id'] = args.attach
+            cmd = 'ssh {user}@{frontend} sacct -X --noheader --state=RUNNING --format="jobid,NodeList,jobname%30,ReqMem,ReqCPUS,Account%30,time" | grep {job_id}'.format(**spec)
+            if args.verbose: print(cmd)
+            stdout, stderr = execute(cmd)
+            (spec['job_id'], spec['node'], spec['job_name'], spec['total_memory'], 
+                spec['cores'], spec['account'], spec['walltime']) = stdout.decode().split()
 
-        time.sleep(5)
+            # get active port on host
+            cmd = "ssh {user}@{frontend} \"ssh {node} 'lsof -i -P | grep LISTEN'\"".format(**spec)
+            if args.verbose: print(cmd)
+            stdout, stderr = execute(cmd)
+            for line in stdout.decode().split('\n'):
+                print(line)
+                if line.startswith("jupyter"):
+                    spec['hostport'] = re.search(r':(\d+) \(LISTEN\)', line).group(1)
+                    if args.verbose: print('Found hostport:', spec['hostport'])
+                    break
+
+        else:
+            spec['job_id'] = submit_slurm_server_job(spec, verbose=args.verbose)
+            print(BLUE+log_prefix()+'Waiting for slurm job allocation'+ENDC)
+
+            spec['node'] = wait_for_job_allocation(spec, verbose=args.verbose)
+            print(BLUE+log_prefix()+'Compute node(s) allocated:', spec['node'], ENDC)
+
+            assert spec['node']
+            print(BLUE+log_prefix()+'Jupyter server: (to stop the server press Ctrl-C)'+ENDC)
+
+            time.sleep(5)
+
+        tup = spec['walltime'].split('-')
+        if len(tup) == 1:
+            days, (hours, mins, secs) = 0, tup[0].split(':')
+        else:
+            days, (hours, mins, secs) = tup[0], tup[1].split(':')
+        end_time = int(time.time()) + int(days) * 86400 + int(hours) * 3600 + int(mins) * 60 + int(secs)
 
         # open connections to stdout and stderr from jupyter server
         stdout_p, stdout_t, stdout_q = open_jupyter_stdout_connection(spec, verbose=args.verbose)
@@ -868,9 +915,12 @@ def slurm_jupyter():
         except:
             pass
 
-        print(BLUE+'\nCanceling slurm job running jupyter server'+ENDC)
-        stdout, stderr = execute('ssh {user}@{frontend} scancel {job_id}'.format(**spec), check_failure=False)
-        sys.exit()
+        if args.attach:
+            print(BLUE+'\nDetached from jupyter server'+ENDC)
+        else:
+            print(BLUE+'\nCanceling slurm job running jupyter server'+ENDC)
+            stdout, stderr = execute('ssh {user}@{frontend} scancel {job_id}'.format(**spec), check_failure=False)
+            sys.exit()
 
     except KeyboardInterrupt:
 
@@ -909,9 +959,12 @@ def slurm_jupyter():
         except:
             pass
 
-        print(BLUE+'\nCanceling slurm job running jupyter server'+ENDC)
-        stdout, stderr = execute('ssh {user}@{frontend} scancel {job_id}'.format(**spec), check_failure=False)
-        sys.exit()
+        if args.attach:
+            print(BLUE+'\nDetached from jupyter server'+ENDC)
+        else:
+            print(BLUE+'\nCanceling slurm job running jupyter server'+ENDC)
+            stdout, stderr = execute('ssh {user}@{frontend} scancel {job_id}'.format(**spec), check_failure=False)
+            sys.exit()
 
 
 def slurm_nb_run():

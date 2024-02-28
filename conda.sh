@@ -1,5 +1,6 @@
 
 # clean slate
+rm -rf conda output
 conda-build purge-all
 
 conda config --set anaconda_upload yes
@@ -18,7 +19,7 @@ name=${PWD##*/}
 conda skeleton pypi --output-dir conda $name
 
 # for for each version of python
-for pythonversion in 3.6 3.7 3.8 3.9 3.10 ; do
+for pythonversion in 3.8 3.9 3.10 3.11 3.12 ; do
     conda-build --python $pythonversion $@ conda/$name
 done
 
