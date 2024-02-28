@@ -7,7 +7,7 @@ openssl req -x509 -nodes -days 10000 -newkey rsa:2048 -keyout mykey.key -out myc
 if [ ! -f jupyter_notebook_config.py ]; then
     jupyter notebook --generate-config
 fi
-hashed_pass=`python -c "from __future__ import print_function; from notebook.auth import passwd; res = passwd(); print(res)"`
+hashed_pass=`python -c "from __future__ import print_function; from jupyter_server.auth import passwd; res = passwd(); print(res)"`
 
 cat <<EOF > jupyter_notebook_config.py
 c.ServerApp.certfile = '/home/$USER/.jupyter/mycert.pem'

@@ -593,7 +593,7 @@ def slurm_jupyter():
                     dest="attach",
                     type=str,
                     default=None,
-                    help="job id of running jupyter server")
+                    help="Slurm job id of running jupyter server")
     parser.add_argument("-s", "--skip-port-check",
                     dest="skip_port_check",
                     action='store_true',
