@@ -12,7 +12,7 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 
 setuptools.setup(
     name="slurm-jupyter",
-    version="2.5.0", # remember to also change version in docs/source/conf.py
+    version="2.5.1", # remember to also change version in docs/source/conf.py
     author="Kasper Munch",
     author_email="kaspermunch@birc.au.dk",
     description="Utilities for jupyter on a slurm cluster.",
@@ -22,8 +22,9 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     scripts=['config-slurm-jupyter.sh'],
     entry_points = {
-        'console_scripts': ['slurm-jupyter=slurm_jupyter:slurm_jupyter',
-                            'slurm-nb-run=slurm_jupyter:slurm_nb_run']
+        'console_scripts': [
+            'slurm-jupyter=slurm_jupyter:slurm_jupyter',
+            'slurm-nb-run=slurm_jupyter:slurm_nb_run']
     },    
     classifiers=[
         "Programming Language :: Python :: 3",

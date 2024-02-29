@@ -131,7 +131,7 @@ def get_cluster_uid(spec):
         stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
     assert not process.returncode
-    uid = int(re.search('uid=(\d+)', stdout).group(1))
+    uid = int(re.search(r'uid=(\d+)', stdout).group(1))
     return uid
 
 
@@ -160,7 +160,7 @@ def submit_slurm_server_job(spec, verbose=False):
     stdout = stdout.decode()
     stderr = stderr.decode()
     try:
-        job_id = re.search('Submitted batch job (\d+)', stdout).group(1)
+        job_id = re.search(r'Submitted batch job (\d+)', stdout).group(1)
     except AttributeError:
         print(BLUE+'Slurm job submission failed'+ENDC)
         print(stdout)
@@ -198,7 +198,7 @@ def submit_slurm_batch_job(spec, verbose=False):
     stdout = stdout.decode()
     stderr = stderr.decode()
     try:
-        job_id = re.search('Submitted batch job (\d+)', stdout).group(1)
+        job_id = re.search(r'Submitted batch job (\d+)', stdout).group(1)
     except AttributeError:
         print('Slurm job submission failed')
         print(stdout)
@@ -408,7 +408,7 @@ def open_browser(spec, force_chrome=False):
     if not spec['url']:
         spec['url'] = 'https://localhost:{port}'.format(**spec)
     if platform.platform().startswith('Darwin') or platform.platform().startswith('macOS-'):
-        chrome_path = 'open -a /Applications/Google\ Chrome.app %s'
+        chrome_path = r'open -a /Applications/Google\ Chrome.app %s'
         if force_chrome and os.path.exists('/Applications/Google Chrome.app'):
             webbrowser.get(chrome_path).open(spec['url'], new=2)
         else:
@@ -510,7 +510,7 @@ def add_slurm_arguments(parser):
     parser.add_argument("-N", "--name",
                     dest="name",
                     type=str,
-                    default="jptr",
+                    default="nn",
                     help="Name prefix of job. Only needed if you run multiple servers and want to be able to recognize a particular one in the cluster queue.")
     parser.add_argument("-u", "--user",
                     dest="user",
@@ -521,7 +521,7 @@ def add_slurm_arguments(parser):
                     dest="environment",
                     type=str,
                     default='',
-                    required=True,                    
+                    # required=True,                    
                     help="Conda environment to run jupyter in.")
     parser.add_argument("-A", "--account",
                     dest="account",
@@ -591,7 +591,11 @@ def slurm_jupyter():
                     help="Print debugging information")
     parser.add_argument("-a", "--attach",
                     dest="attach",
-                    type=str,
+                    action='store_true',
+                    help="Slurm job id of running jupyter server")
+    parser.add_argument("-j", "--slurm-jobid",
+                    dest="slurm_jobid",
+                    type=int,
                     default=None,
                     help="Slurm job id of running jupyter server")
     parser.add_argument("-s", "--skip-port-check",
@@ -632,7 +636,7 @@ def slurm_jupyter():
             'tmp_dir': '.slurm_jupyter',
             'frontend': args.frontend,
             'hostport': args.hostport,
-            'job_name': "{}_{}_{}_{}".format(args.name, getpass.getuser(), args.environment, int(time.time())),
+            'job_name': "sjup_{}_{}_{}_{}".format(args.name, getpass.getuser(), args.environment, int(time.time())),
             'job_id': None,
             'url': None}
 
@@ -654,18 +658,18 @@ def slurm_jupyter():
         sys.exit()
 
     if not args.attach:
-        # check environment exists on the cluster:
-        cmd = 'ssh kmt@login.genome.au.dk "conda info --envs | grep \'{environment_name}\s\'"'.format(**spec)
-        if args.verbose: print(cmd)
-        stdout, stderr = execute(cmd)
-        if args.verbose: print(stdout)
-        if not args.attach:
-            if process.returncode or stdout.decode().split()[0] != spec['environment_name']:
-                print("Specified environment {environment} was not found on the cluster: {user}@{frontend}".format(**spec))
-                sys.exit()
+        # # check environment exists on the cluster:
+        # cmd = r'''ssh kmt@login.genome.au.dk "conda info --envs | grep '{environment_name}\s'"'''.format(**spec)
+        # if args.verbose: print(cmd)
+        # stdout, stderr = execute(cmd)
+        # if args.verbose: print(stdout.decode())
+        # if not args.attach:
+        #     if stdout.decode().split()[0] != spec['environment_name']:
+        #         print("Specified environment {environment_name} was not found at {user}@{frontend}".format(**spec))
+        #         sys.exit()
 
         # get environment manager:
-        cmd = """ssh -q {user}@{frontend} 'conda info --envs | sed -n "s/^base\s*\*\s*\/home\/$USER\/\(.*\)/\\1/p"' """.format(**spec)
+        cmd = r"""ssh -q {user}@{frontend} 'conda info --envs | sed -n "s/^base\s*\*\s*\/home\/$USER\/\(.*\)/\\1/p"' """.format(**spec)
         process = subprocess.Popen(
             cmd,
             shell=True,
@@ -751,7 +755,25 @@ def slurm_jupyter():
 
         if args.attach:
             # populate spec
-            spec['job_id'] = args.attach
+
+            if args.slurm_jobid:
+                spec['job_id'] = args.slurm_jobid
+            else:
+                cmd = 'ssh {user}@{frontend} sacct -X --noheader --state=RUNNING --format="jobid,jobname%50"'.format(**spec)
+                if args.verbose: print(cmd)
+                stdout, stderr = execute(cmd)
+                for line in stdout.decode().split('\n'):
+                    if line:
+                        job_id, job_name = line.split()
+                        match = re.match(r'sjup_([^_]+)_([^_]+)_([^_]+)_\d+', job_name)
+                        if match:
+                            spec['name'], spec['user'], spec['environment_name'] = match.groups()
+                            spec['job_id'] = job_id
+                            break
+            if not spec['job_id']:
+                print("No running jupyter server found")
+                sys.exit()
+
             cmd = 'ssh {user}@{frontend} sacct -X --noheader --state=RUNNING --format="jobid,NodeList,jobname%30,ReqMem,ReqCPUS,Account%30,time" | grep {job_id}'.format(**spec)
             if args.verbose: print(cmd)
             stdout, stderr = execute(cmd)
@@ -759,11 +781,10 @@ def slurm_jupyter():
                 spec['cores'], spec['account'], spec['walltime']) = stdout.decode().split()
 
             # get active port on host
-            cmd = "ssh {user}@{frontend} \"ssh {node} 'lsof -i -P | grep LISTEN'\"".format(**spec)
+            cmd = """ssh {user}@{frontend} "ssh {node} 'lsof -i -P | grep LISTEN'" """.format(**spec)
             if args.verbose: print(cmd)
             stdout, stderr = execute(cmd)
             for line in stdout.decode().split('\n'):
-                print(line)
                 if line.startswith("jupyter"):
                     spec['hostport'] = re.search(r':(\d+) \(LISTEN\)', line).group(1)
                     if args.verbose: print('Found hostport:', spec['hostport'])
@@ -845,12 +866,12 @@ def slurm_jupyter():
                     if 'SSLV3_ALERT_CERTIFICATE_UNKNOWN' not in line: # skip warnings about SSL certificate
                         print(line, end="")
 
-                    if re.search('Jupyter Notebook[\d. ]+is running', line) or re.search('Jupyter Server[\d. ]+is running', line):
+                    if re.search(r'Jupyter Notebook[\d. ]+is running', line) or re.search(r'Jupyter Server[\d. ]+is running', line):
                         port_p, port_t, port_q = open_port(spec, verbose=args.verbose)
                         token_url = None # server is runing, we now look for a token url
 
                     # look for the token url
-                    m = re.search('https?://127.0.0.1\S+', line)
+                    m = re.search(r'https?://127.0.0.1\S+', line)
                     if m and not token_url:
                         token_url = m.group(0)
                         spec['url'] = token_url
@@ -862,7 +883,7 @@ def slurm_jupyter():
                                    prefix+' Once ready, jupyter may ask for your cluster password.'+ENDC, sep='')
 
                     # in case we missed the token url
-                    m = re.search('Use Control-C to stop this server', line)
+                    m = re.search(r'Use Control-C to stop this server', line)
                     # if m and not token_url:
                     #     open_browser(spec, force_chrome=args.chrome)
                     #     prefix = log_prefix()
