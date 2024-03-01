@@ -669,7 +669,7 @@ def slurm_jupyter():
         #         sys.exit()
 
         # get environment manager:
-        cmd = r"""ssh -q {user}@{frontend} 'conda info --envs | sed -n "s/^base\s*\*\s*\/home\/$USER\/\(.*\)/\\1/p"' """.format(**spec)
+        cmd = r"""ssh -q {user}@{frontend} 'conda info --envs | sed -n "s/^base\s*\**\s*\/home\/$USER\/\(.*\)/\\1/p"' """.format(**spec)
         process = subprocess.Popen(
             cmd,
             shell=True,
