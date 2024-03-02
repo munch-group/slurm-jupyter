@@ -223,13 +223,15 @@ def wait_for_job_allocation(spec, verbose=False):
     time.sleep(20)
 
     regex = re.compile(r'(s\d+n\d+|cn-\d+)')
-    cmd = 'ssh {user}@{frontend} squeue --noheader --format %N -j {job_id}'.format(**spec)        
+    cmd = 'ssh {user}@{frontend} squeue --noheader --format %N -j {job_id}'.format(**spec)
+    if verbose: print(cmd)
     stdout, stderr = execute(cmd)
     stdout = stdout.decode()
     m = regex.search(stdout)
 
     while not m or m.group(1) == 'None':
         time.sleep(10)
+        if verbose: print(cmd)
         stdout, stderr = execute(cmd)
         stdout = stdout.decode()
         m = regex.search(stdout)
@@ -644,6 +646,7 @@ def slurm_jupyter():
 
     # test ssh connection:
     cmd = 'ssh -q {user}@{frontend} exit'.format(**spec)
+    if args.verbose: print(cmd)
     cmd = shlex.split(cmd)
     cmd[0] = shutil.which(cmd[0])  
     process = subprocess.Popen(
@@ -658,18 +661,19 @@ def slurm_jupyter():
         sys.exit()
 
     if not args.attach:
-        # # check environment exists on the cluster:
-        # cmd = r'''ssh kmt@login.genome.au.dk "conda info --envs | grep '{environment_name}\s'"'''.format(**spec)
-        # if args.verbose: print(cmd)
-        # stdout, stderr = execute(cmd)
-        # if args.verbose: print(stdout.decode())
-        # if not args.attach:
-        #     if stdout.decode().split()[0] != spec['environment_name']:
-        #         print("Specified environment {environment_name} was not found at {user}@{frontend}".format(**spec))
-        #         sys.exit()
+        # check environment exists on the cluster:
+        cmd = r'''ssh kmt@login.genome.au.dk "conda info --envs | grep '{environment_name}\s'"'''.format(**spec)
+        if args.verbose: print(cmd)
+        stdout, stderr = execute(cmd)
+        if args.verbose: print(stdout.decode())
+        if not args.attach:
+            if stdout.decode().split()[0] != spec['environment_name']:
+                print("Specified environment {environment_name} was not found at {user}@{frontend}".format(**spec))
+                sys.exit()
 
         # get environment manager:
         cmd = r"""ssh -q {user}@{frontend} 'conda info --envs | sed -n "s/^base\s*\**\s*\/home\/$USER\/\(.*\)/\\1/p"' """.format(**spec)
+        if args.verbose: print(cmd)
         process = subprocess.Popen(
             cmd,
             shell=True,
@@ -678,6 +682,8 @@ def slurm_jupyter():
             stderr=subprocess.PIPE)
         stdout, stderr = process.communicate()
         if process.returncode:
+            print("Cannot identify cluster package mannager.")
+
             print("Cannot make ssh connection: {user}@{frontend}".format(**spec))
             sys.exit()
         else:
@@ -689,7 +695,7 @@ def slurm_jupyter():
                 spec['package_manager'] = manager
 
         if not spec['package_manager'] or spec['package_manager'] not in ['miniconda3', 'anaconda3', 'miniforge3', 'mambaforge']:
-            print("Cannot find cluster package mannager. Are you using either miniconda3, anaconda3, miniforge3, or mambaforge ?")
+            print("Conda package manager should be either miniconda3, anaconda3, miniforge3, or mambaforge.")
             sys.exit()
 
         # TODO: test port check and make sure it works
@@ -697,6 +703,7 @@ def slurm_jupyter():
             spec['port'] = get_cluster_uid(spec)        
             if sys.platform == "darwin":
                 cmd = f"lsof -i -P | grep LISTEN"           
+                if args.verbose: print(cmd)
                 stdout, stderr = execute(cmd, shell=True, check_failure=False)
                 stdout = stdout.decode()
                 for port_bump in range(10):
@@ -940,7 +947,9 @@ def slurm_jupyter():
             print(BLUE+'\nDetached from jupyter server'+ENDC)
         else:
             print(BLUE+'\nCanceling slurm job running jupyter server'+ENDC)
-            stdout, stderr = execute('ssh {user}@{frontend} scancel {job_id}'.format(**spec), check_failure=False)
+            cmd = 'ssh {user}@{frontend} scancel {job_id}'.format(**spec)
+            if args.verbose: print(cmd)
+            stdout, stderr = execute(cmd, check_failure=False)
             sys.exit()
 
     except KeyboardInterrupt:
@@ -984,7 +993,9 @@ def slurm_jupyter():
             print(BLUE+'\nDetached from jupyter server'+ENDC)
         else:
             print(BLUE+'\nCanceling slurm job running jupyter server'+ENDC)
-            stdout, stderr = execute('ssh {user}@{frontend} scancel {job_id}'.format(**spec), check_failure=False)
+            cmd = 'ssh {user}@{frontend} scancel {job_id}'.format(**spec)
+            if args.verbose: print(cmd)
+            stdout, stderr = execute(cmd, check_failure=False)
             sys.exit()
 
 
