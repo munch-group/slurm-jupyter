@@ -604,6 +604,10 @@ def slurm_jupyter():
                     dest="skip_port_check",
                     action='store_true',
                     help="Skip searching for an available port. Saves time when only running a single instance.")
+    parser.add_argument("-x", "--skip-update-check",
+                    dest="skip_update_check",
+                    action='store_true',
+                    help="Skip searching for a package update.")
 
     args = parser.parse_args()
 
@@ -642,7 +646,8 @@ def slurm_jupyter():
             'job_id': None,
             'url': None}
 
-    check_for_conda_update()
+    if not args.skip_update_check:
+        check_for_conda_update()
 
     # test ssh connection:
     cmd = 'ssh -q {user}@{frontend} exit'.format(**spec)
@@ -662,7 +667,7 @@ def slurm_jupyter():
 
     if not args.attach:
         # check environment exists on the cluster:
-        cmd = r'''ssh kmt@login.genome.au.dk "conda info --envs | grep '{environment_name}\s'"'''.format(**spec)
+        cmd = r'''ssh {user}@{frontend} "conda info --envs | grep '{environment_name}\s'"'''.format(**spec)
         if args.verbose: print(cmd)
         stdout, stderr = execute(cmd)
         if args.verbose: print(stdout.decode())
@@ -672,7 +677,7 @@ def slurm_jupyter():
                 sys.exit()
 
         # get environment manager:
-        cmd = r"""ssh -q {user}@{frontend} 'conda info --envs | sed -n "s/^base\s*\**\s*\/home\/$USER\/\(.*\)/\\1/p"' """.format(**spec)
+        cmd = r"ssh -q {user}@{frontend} 'echo $CONDA_PREFIX'".format(**spec)
         if args.verbose: print(cmd)
         process = subprocess.Popen(
             cmd,
@@ -682,9 +687,7 @@ def slurm_jupyter():
             stderr=subprocess.PIPE)
         stdout, stderr = process.communicate()
         if process.returncode:
-            print("Cannot identify cluster package mannager.")
-
-            print("Cannot make ssh connection: {user}@{frontend}".format(**spec))
+            print("Cannot identify cluster package mannager (CONDA_PREFIX not set).")
             sys.exit()
         else:
             spec['package_manager'] = stdout.strip()
