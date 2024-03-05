@@ -688,8 +688,24 @@ def slurm_jupyter():
             stderr=subprocess.PIPE)
         stdout, stderr = process.communicate()
         if process.returncode:
-            print("Cannot identify cluster package mannager (CONDA_PREFIX not set).")
-            sys.exit()
+
+
+            cmd = r"""ssh -q {user}@{frontend} 'conda run -n base echo $CONDA_PREFIX' """.format(**spec)
+            if args.verbose: print(cmd)
+            process = subprocess.Popen(
+                cmd,
+                shell=True,
+                universal_newlines=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE)
+            stdout, stderr = process.communicate()
+            if process.returncode:
+
+                print("Cannot identify cluster package mannager (CONDA_PREFIX not set).")
+                sys.exit()
+            else:
+                spec['package_manager'] = stdout.strip()
+
         else:
             spec['package_manager'] = stdout.strip()
 
