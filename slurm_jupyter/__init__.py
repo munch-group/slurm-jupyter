@@ -677,7 +677,7 @@ def slurm_jupyter():
                 sys.exit()
 
         # get environment manager:
-        cmd = r"ssh -q {user}@{frontend} 'echo $CONDA_PREFIX'".format(**spec)
+        cmd = r"ssh -q {user}@{frontend} 'conda run -n base 'echo $CONDA_PREFIX''".format(**spec)
         if args.verbose: print(cmd)
         process = subprocess.Popen(
             cmd,
