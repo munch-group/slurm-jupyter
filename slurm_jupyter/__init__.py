@@ -678,21 +678,17 @@ def slurm_jupyter():
                 sys.exit()
 
         # get environment manager:
-        cmd = r"ssh -q {user}@{frontend} 'conda config --show root_prefix' ".format(**spec)
-        if args.verbose: print(cmd)
-        process = subprocess.Popen(
-            cmd,
-            shell=True,
-            universal_newlines=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE)
-        stdout, stderr = process.communicate()
+        cmd = r'ssh -q {user}@{frontend} "conda config --show root_prefix"'.format(**spec)
+        stdout, stderr = execute(cmd)
+        if args.verbose: print(stdout.decode())
         # if process.returncode:
         #     print("Cannot identify cluster package mannager (CONDA_PREFIX not set).")
         #     sys.exit()
         # else:
         #     spec['package_manager'] = stdout.strip()
-        spec['package_manager'] = stdout.strip()
+        spec['package_manager'] = stdout.decode().strip()
+
+        if args.verbose: print(spec['package_manager'])
 
         # in case the cluster bash string comes back with profile formatting around the manager name
         for manager in ['miniconda3', 'anaconda3', 'miniforge3', 'mambaforge']:
