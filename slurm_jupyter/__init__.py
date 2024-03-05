@@ -667,12 +667,13 @@ def slurm_jupyter():
 
     if not args.attach:
         # check environment exists on the cluster:
-        cmd = r'''ssh {user}@{frontend} "conda info --envs | grep '{environment_name}\s'"'''.format(**spec)
+        # cmd = r'''ssh {user}@{frontend} "conda info --envs | grep '{environment_name}\s'"'''.format(**spec)
+        cmd = r'ssh {user}@{frontend} "conda info --envs"'.format(**spec)
         if args.verbose: print(cmd)
         stdout, stderr = execute(cmd)
         if args.verbose: print(stdout.decode())
         if not args.attach:
-            if stdout.decode().split()[0] != spec['environment_name']:
+            if not any(line.startswith(spec['environment_name'] + ' ') for line in stdout.decode().split('\n')):
                 print("Specified environment {environment_name} was not found at {user}@{frontend}".format(**spec))
                 sys.exit()
 
