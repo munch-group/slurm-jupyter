@@ -673,12 +673,12 @@ def slurm_jupyter():
         stdout, stderr = execute(cmd)
         if args.verbose: print(stdout.decode())
         if not args.attach:
-            if not any(line.startswith(spec['environment_name'] + ' ') for line in stdout.decode().split('\n')):
+            if not any(line.startswith(spec['environment_name'] + ' ') or line.endswith(' ' + spec['environment_name'])  for line in stdout.decode().split('\n')):
                 print("Specified environment {environment_name} was not found at {user}@{frontend}".format(**spec))
                 sys.exit()
 
         # get environment manager:
-        cmd = r"ssh -q {user}@{frontend} 'conda run -n base 'echo $CONDA_PREFIX''".format(**spec)
+        cmd = r"""ssh -q {user}@{frontend} 'conda run -n base bash -c "echo \${{CONDA_PREFIX}}"' """.format(**spec)
         if args.verbose: print(cmd)
         process = subprocess.Popen(
             cmd,
@@ -701,6 +701,8 @@ def slurm_jupyter():
         if not spec['package_manager'] or spec['package_manager'] not in ['miniconda3', 'anaconda3', 'miniforge3', 'mambaforge']:
             print("Conda package manager should be either miniconda3, anaconda3, miniforge3, or mambaforge.")
             sys.exit()
+
+        if args.verbose: print("Found package manager:", spec['package_manager'])
 
         # TODO: test port check and make sure it works
         if spec['port'] is None and spec['hostport'] is None and not args.skip_port_check:
