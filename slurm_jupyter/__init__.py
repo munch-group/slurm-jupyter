@@ -687,11 +687,12 @@ def slurm_jupyter():
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
         stdout, stderr = process.communicate()
-        if process.returncode:
-            print("Cannot identify cluster package mannager (CONDA_PREFIX not set).")
-            sys.exit()
-        else:
-            spec['package_manager'] = stdout.strip()
+        # if process.returncode:
+        #     print("Cannot identify cluster package mannager (CONDA_PREFIX not set).")
+        #     sys.exit()
+        # else:
+        #     spec['package_manager'] = stdout.strip()
+        spec['package_manager'] = stdout.strip()
 
         # in case the cluster bash string comes back with profile formatting around the manager name
         for manager in ['miniconda3', 'anaconda3', 'miniforge3', 'mambaforge']:
