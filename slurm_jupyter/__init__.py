@@ -33,7 +33,7 @@ except ImportError:
     from queue import Queue, Empty  # python 3.x
 
 from .templates import slurm_server_script, slurm_batch_script, mem_script
-from .utils import execute, modpath, on_windows, str_to_mb, seconds2string, human2walltime
+from .utils import execute, modpath, on_windows, str_to_mb, seconds2string, human2walltime, ExecuteException
 
 # global run event to communicate with threads
 RUN_EVENT = None
@@ -652,18 +652,24 @@ def slurm_jupyter():
     # test ssh connection:
     cmd = 'ssh -q {user}@{frontend} exit'.format(**spec)
     if args.verbose: print(cmd)
-    cmd = shlex.split(cmd)
-    cmd[0] = shutil.which(cmd[0])  
-    process = subprocess.Popen(
-        cmd,
-        shell=False,
-        universal_newlines=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE)
-    stdout, stderr = process.communicate()
-    if process.returncode:
+    try:
+        stdout, stderr = execute(cmd)   
+    except ExecuteException as e:
         print("Cannot make ssh connection: {user}@{frontend}".format(**spec))
         sys.exit()
+
+    # cmd = shlex.split(cmd)
+    # cmd[0] = shutil.which(cmd[0])  
+    # process = subprocess.Popen(
+    #     cmd,
+    #     shell=False,
+    #     universal_newlines=True,
+    #     stdout=subprocess.PIPE,
+    #     stderr=subprocess.PIPE)
+    # stdout, stderr = process.communicate()
+    # if process.returncode:
+    #     print("Cannot make ssh connection: {user}@{frontend}".format(**spec))
+    #     sys.exit()
 
     if not args.attach:
         # check environment exists on the cluster:
@@ -703,7 +709,8 @@ def slurm_jupyter():
 
         # TODO: test port check and make sure it works
         if spec['port'] is None and spec['hostport'] is None and not args.skip_port_check:
-            spec['port'] = get_cluster_uid(spec)        
+            spec['port'] = get_cluster_uid(spec) 
+
             if sys.platform == "darwin":
                 cmd = f"lsof -i -P | grep LISTEN"           
                 if args.verbose: print(cmd)

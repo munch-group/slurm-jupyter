@@ -4,6 +4,9 @@ from subprocess import PIPE, Popen
 import shlex
 import shutil
 
+class ExecuteException(Exception):
+    pass
+
 def seconds2string(sec):
     """Convert seconds to slurm time spec.
 
@@ -42,7 +45,8 @@ def execute(cmd, stdin=None, shell=False, check_failure=True):
         process = Popen(lst, stdin=PIPE, stdout=PIPE, stderr=PIPE)
     stdout, stderr = process.communicate(stdin)
     if check_failure:
-        assert not process.returncode
+        if process.returncode:
+            raise ExecuteException(f'Command failed: {cmd}\n{stderr.decode()}')
     return stdout, stderr
 
 
